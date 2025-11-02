@@ -207,6 +207,7 @@
         const chatSubmit = document.getElementById('chat-submit');
         const chatHistoryEl = document.getElementById('chat-history');
         const chatEndpoint = "{% url 'campus:chat' %}";
+        let typingEl = null;
 
         function persistHistory(history) {
             try {
@@ -237,6 +238,28 @@
             return message;
         }
 
+        function showTypingIndicator() {
+            if (typingEl) {
+                return;
+            }
+            typingEl = document.createElement('div');
+            typingEl.className = 'chat-message assistant typing';
+            const indicator = document.createElement('span');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = 'Thinking<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+            typingEl.appendChild(indicator);
+            chatHistoryEl.appendChild(typingEl);
+            chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            if (!typingEl) {
+                return;
+            }
+            typingEl.remove();
+            typingEl = null;
+        }
+
         function renderHistory(history) {
             chatHistoryEl.innerHTML = '';
             history.forEach((entry) => {
@@ -259,6 +282,8 @@
             renderHistory(updatedHistory);
             persistHistory(updatedHistory);
 
+            showTypingIndicator();
+
             chatInput.value = '';
             chatInput.disabled = true;
             chatSubmit.disabled = true;
@@ -277,6 +302,7 @@
                 });
 
                 const data = await response.json();
+                hideTypingIndicator();
                 const reply = data.reply || data.error || 'Sorry, something went wrong.';
                 const assistantEntry = { role: 'assistant', content: reply };
                 const finalHistory = [...updatedHistory, assistantEntry];
@@ -284,6 +310,7 @@
                 persistHistory(finalHistory);
             } catch (error) {
                 console.error('Chat failed', error);
+                hideTypingIndicator();
                 const assistantEntry = {
                     role: 'assistant',
                     content: 'I could not reach the campus assistant. Please try again shortly.',

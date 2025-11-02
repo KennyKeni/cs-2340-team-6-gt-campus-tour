@@ -6,6 +6,7 @@ from typing import Iterable, Sequence
 from django.conf import settings
 
 from pydantic_ai import Agent
+from pydantic_ai.models import ModelSettings
 
 
 class CampusAiError(Exception):
@@ -41,7 +42,15 @@ def _build_agent() -> Agent[str]:
         "Speak in plain conversational text only—do not use bullet points, numbered lists, or special formatting."
     )
 
-    return Agent(model=model, instructions=system_prompt)
+    model_settings = ModelSettings(
+        extra_body={
+            'provider': {
+                'sort': 'throughput',
+            },
+        },
+    )
+
+    return Agent(model=model, instructions=system_prompt, model_settings=model_settings)
 
 
 def _format_history(history: Sequence[ChatMessage]) -> str:
