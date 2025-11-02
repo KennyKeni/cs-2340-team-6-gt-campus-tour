@@ -4,10 +4,37 @@
 
 {% block content %}
 <div class="campus-layout">
-    <section class="panel">
-        <header class="panel-heading">Explore Georgia Tech</header>
-        <div class="side-panel-placeholder">
-            Future enhancements will appear here, including curated walking tours and filters.
+    <section class="panel side-panel" aria-labelledby="explore-heading">
+        <header id="explore-heading" class="panel-heading">Explore Georgia Tech</header>
+        <div class="sidebar-controls">
+            <label class="visually-hidden" for="sidebar-view">Select view</label>
+            <select id="sidebar-view" class="sidebar-select" aria-label="Choose content to display">
+                <option value="locations" selected>Locations</option>
+                <option value="tours">Tours</option>
+            </select>
+            <div class="sidebar-search">
+                <label class="visually-hidden" for="location-search">Search locations</label>
+                <input id="location-search" type="search" placeholder="Search locations..." autocomplete="off">
+            </div>
+        </div>
+        <div id="location-list-section" class="sidebar-content" aria-live="polite">
+            <p class="sidebar-support-text">Browse campus highlights and tap markers on the map to learn more.</p>
+            <div id="location-items" class="location-list">
+                {% for location in locations %}
+                <article class="location-card"
+                    data-name="{{ location.name|lower }}"
+                    data-category="{{ location.category|default_if_none:''|lower }}"
+                    data-address="{{ location.address|default_if_none:''|lower }}"
+                    data-description="{{ location.description|lower }}">
+                    <h3 class="location-title">{{ location.name }}</h3>
+                    <p class="location-meta">{{ location.category|default:"Campus Highlight" }}</p>
+                </article>
+                {% endfor %}
+            </div>
+            <p id="location-empty" class="sidebar-empty" hidden>No locations match your search.</p>
+        </div>
+        <div id="tour-list-section" class="sidebar-content" aria-live="polite" hidden>
+            <p class="sidebar-placeholder">Guided tours are coming soon. Stay tuned for curated itineraries!</p>
         </div>
     </section>
     <section class="panel map-panel" aria-labelledby="map-heading">
@@ -59,10 +86,33 @@
         if (!mapElement) {
             return;
         }
+        const adjustedCenter = {
+            lat: mapCenter.lat - 0.0015,
+            lng: mapCenter.lng,
+        };
+
         map = new google.maps.Map(mapElement, {
-            center: mapCenter,
-            zoom: 16,
-            mapId: 'GT_CAMPUS_TOUR_MAP',
+            center: adjustedCenter,
+            zoom: 17,
+            disableDefaultUI: true,
+            zoomControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            mapTypeControl: false,
+            draggable: false,
+            scrollwheel: false,
+            disableDoubleClickZoom: true,
+            keyboardShortcuts: false,
+            gestureHandling: 'none',
+            styles: [
+                { featureType: 'poi', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+                { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+                { featureType: 'poi', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
+                { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+                { featureType: 'poi.park', stylers: [{ visibility: 'off' }] },
+                { featureType: 'poi.school', stylers: [{ visibility: 'off' }] },
+                { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+            ],
         });
 
         const infoWindow = new google.maps.InfoWindow();
@@ -72,6 +122,14 @@
                 position: { lat: location.latitude, lng: location.longitude },
                 map,
                 title: location.name,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 7,
+                    fillColor: '#fbbf24',
+                    fillOpacity: 1,
+                    strokeColor: '#003057',
+                    strokeWeight: 2,
+                },
             });
 
             marker.addListener('click', () => {
@@ -80,6 +138,66 @@
             });
         });
     };
+</script>
+<script>
+    (function () {
+        const viewSelect = document.getElementById('sidebar-view');
+        const searchInput = document.getElementById('location-search');
+        const locationSection = document.getElementById('location-list-section');
+        const toursSection = document.getElementById('tour-list-section');
+        const emptyState = document.getElementById('location-empty');
+        const locationItems = Array.from(document.querySelectorAll('#location-items .location-card'));
+
+        if (!viewSelect || !searchInput) {
+            return;
+        }
+
+        function applyFilter() {
+            const query = searchInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            locationItems.forEach((item) => {
+                const haystack = [
+                    item.dataset.name,
+                    item.dataset.category,
+                    item.dataset.address,
+                    item.dataset.description,
+                ].join(' ');
+
+                const matches = !query || haystack.includes(query);
+                item.hidden = !matches;
+                if (matches) {
+                    visibleCount += 1;
+                }
+            });
+
+            emptyState.hidden = visibleCount > 0;
+        }
+
+        function toggleView() {
+            const view = viewSelect.value;
+
+            if (view === 'locations') {
+                locationSection.hidden = false;
+                toursSection.hidden = true;
+                searchInput.disabled = false;
+                searchInput.placeholder = 'Search locations...';
+                applyFilter();
+            } else {
+                locationSection.hidden = true;
+                toursSection.hidden = false;
+                searchInput.value = '';
+                searchInput.disabled = true;
+                searchInput.placeholder = 'Search disabled for tours';
+                emptyState.hidden = true;
+            }
+        }
+
+        viewSelect.addEventListener('change', toggleView);
+        searchInput.addEventListener('input', applyFilter);
+
+        toggleView();
+    })();
 </script>
 <script>
     (function () {
