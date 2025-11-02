@@ -1,0 +1,26 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GT Tour{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'styles.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+    <body>
+        <header>
+            <h1>GT Campus Explorer</h1>
+            <nav aria-label="Primary navigation">
+            {% block nav_links %}
+            <a href="{% url 'home' %}" class="nav-link">Home</a>
+            <a href="{% url 'campus:overview' %}" class="nav-button">Campus Map</a>
+            {% endblock %}
+            </nav>
+        </header>
+        <main>
+            {% block content %}{% endblock %}
+    </main>
+    {% block extra_body %}{% endblock %}
+</body>
+</html>

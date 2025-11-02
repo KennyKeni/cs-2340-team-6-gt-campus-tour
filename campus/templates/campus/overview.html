@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Campus Overview | GT Tour{% endblock %}
+
+{% block content %}
+<div class="campus-layout">
+    <section class="panel">
+        <header class="panel-heading">Explore Georgia Tech</header>
+        <div class="side-panel-placeholder">
+            Future enhancements will appear here, including curated walking tours and filters.
+        </div>
+    </section>
+    <section class="panel map-panel" aria-labelledby="map-heading">
+        <header id="map-heading" class="panel-heading">Campus Map</header>
+        {% if not google_maps_api_key %}
+        <div style="padding: 1rem;">
+            <p>Map unavailable: missing Google Maps API key.</p>
+        </div>
+        {% endif %}
+        <div id="campus-map" class="map-canvas" role="application" aria-label="Georgia Tech campus map">
+        </div>
+    </section>
+    <section class="panel chat-panel" aria-labelledby="chat-heading">
+        <header id="chat-heading" class="panel-heading">Ask About Landmarks</header>
+        <div id="chat-history" class="chat-history" aria-live="polite">
+        </div>
+        <form id="chat-form" class="chat-input" novalidate>
+            <label for="chat-message" class="visually-hidden">Ask a question about campus landmarks</label>
+            <textarea id="chat-message" name="message" placeholder="Ask about a building or landmark..." required></textarea>
+            <button type="submit" id="chat-submit">Send</button>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+{{ locations_payload|json_script:"initial-location-data" }}
+{{ map_center|json_script:"map-center-data" }}
+<script>
+    const locationData = JSON.parse(document.getElementById('initial-location-data').textContent);
+    const mapCenter = JSON.parse(document.getElementById('map-center-data').textContent);
+    let map;
+
+    function createInfoWindowContent(location) {
+        const addressLine = location.address ? `<p><strong>Address:</strong> ${location.address}</p>` : '';
+        const categoryLine = location.category ? `<p><strong>Category:</strong> ${location.category}</p>` : '';
+        return `
+            <div>
+                <h3 style="margin: 0 0 0.5rem; font-size: 1.1rem;">${location.name}</h3>
+                ${categoryLine}
+                ${addressLine}
+                <p style="margin: 0;">${location.description}</p>
+            </div>
+        `;
+    }
+
+    window.initCampusMap = function initCampusMap() {
+        const mapElement = document.getElementById('campus-map');
+        if (!mapElement) {
+            return;
+        }
+        map = new google.maps.Map(mapElement, {
+            center: mapCenter,
+            zoom: 16,
+            mapId: 'GT_CAMPUS_TOUR_MAP',
+        });
+
+        const infoWindow = new google.maps.InfoWindow();
+
+        locationData.forEach((location) => {
+            const marker = new google.maps.Marker({
+                position: { lat: location.latitude, lng: location.longitude },
+                map,
+                title: location.name,
+            });
+
+            marker.addListener('click', () => {
+                infoWindow.setContent(createInfoWindowContent(location));
+                infoWindow.open(map, marker);
+            });
+        });
+    };
+</script>
+<script>
+    (function () {
+        const storageKey = 'campusChatHistory';
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-message');
+        const chatSubmit = document.getElementById('chat-submit');
+        const chatHistoryEl = document.getElementById('chat-history');
+        const chatEndpoint = "{% url 'campus:chat' %}";
+
+        function persistHistory(history) {
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(history));
+            } catch (error) {
+                console.warn('Unable to persist chat history', error);
+            }
+        }
+
+        function loadHistory() {
+            try {
+                const raw = localStorage.getItem(storageKey);
+                if (!raw) {
+                    return [];
+                }
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn('Unable to load chat history', error);
+                return [];
+            }
+        }
+
+        function createMessageElement(entry) {
+            const message = document.createElement('div');
+            message.classList.add('chat-message', entry.role === 'assistant' ? 'assistant' : 'user');
+            message.textContent = entry.content;
+            return message;
+        }
+
+        function renderHistory(history) {
+            chatHistoryEl.innerHTML = '';
+            history.forEach((entry) => {
+                chatHistoryEl.appendChild(createMessageElement(entry));
+            });
+            chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        }
+
+        async function sendMessage(event) {
+            event.preventDefault();
+            const content = chatInput.value.trim();
+            if (!content) {
+                return;
+            }
+
+            const history = loadHistory();
+            const userEntry = { role: 'user', content };
+            const updatedHistory = [...history, userEntry];
+
+            renderHistory(updatedHistory);
+            persistHistory(updatedHistory);
+
+            chatInput.value = '';
+            chatInput.disabled = true;
+            chatSubmit.disabled = true;
+            chatSubmit.setAttribute('aria-disabled', 'true');
+
+            try {
+                const response = await fetch(chatEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: content,
+                        history,
+                    }),
+                });
+
+                const data = await response.json();
+                const reply = data.reply || data.error || 'Sorry, something went wrong.';
+                const assistantEntry = { role: 'assistant', content: reply };
+                const finalHistory = [...updatedHistory, assistantEntry];
+                renderHistory(finalHistory);
+                persistHistory(finalHistory);
+            } catch (error) {
+                console.error('Chat failed', error);
+                const assistantEntry = {
+                    role: 'assistant',
+                    content: 'I could not reach the campus assistant. Please try again shortly.',
+                };
+                const failedHistory = [...updatedHistory, assistantEntry];
+                renderHistory(failedHistory);
+                persistHistory(failedHistory);
+            } finally {
+                chatInput.disabled = false;
+                chatSubmit.disabled = false;
+                chatSubmit.setAttribute('aria-disabled', 'false');
+                chatInput.focus();
+            }
+        }
+
+        const initialHistory = loadHistory();
+        renderHistory(initialHistory);
+
+        chatForm.addEventListener('submit', sendMessage);
+    })();
+</script>
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initCampusMap" async defer></script>
+{% endif %}
+{% endblock %}
