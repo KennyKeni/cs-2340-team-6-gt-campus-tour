@@ -25,9 +25,26 @@
                     data-name="{{ location.name|lower }}"
                     data-category="{{ location.category|default_if_none:''|lower }}"
                     data-address="{{ location.address|default_if_none:''|lower }}"
-                    data-description="{{ location.description|lower }}">
-                    <h3 class="location-title">{{ location.name }}</h3>
-                    <p class="location-meta">{{ location.category|default:"Campus Highlight" }}</p>
+                    data-description="{{ location.description|lower }}"
+                    data-slug="{{ location.slug }}">
+                    <div class="location-header">
+                        <div class="location-info">
+                            <h3 class="location-title">{{ location.name }}</h3>
+                            <p class="location-meta">{{ location.category|default:"Campus Highlight" }}</p>
+                        </div>
+                        {% if user.is_authenticated %}
+                        <button class="bookmark-btn" 
+                                data-slug="{{ location.slug }}" 
+                                data-bookmarked="{% if location.slug in bookmarked_slugs %}true{% else %}false{% endif %}"
+                                aria-label="{% if location.slug in bookmarked_slugs %}Remove bookmark for {{ location.name }}{% else %}Bookmark {{ location.name }}{% endif %}"
+                                title="{% if location.slug in bookmarked_slugs %}Remove bookmark{% else %}Add bookmark{% endif %}">
+                            <svg class="bookmark-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path class="bookmark-outline" d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path class="bookmark-fill" d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" fill="currentColor"/>
+                            </svg>
+                        </button>
+                        {% endif %}
+                    </div>
                 </article>
                 {% endfor %}
             </div>
@@ -71,12 +88,31 @@
     function createInfoWindowContent(location) {
         const addressLine = location.address ? `<p><strong>Address:</strong> ${location.address}</p>` : '';
         const categoryLine = location.category ? `<p><strong>Category:</strong> ${location.category}</p>` : '';
+        
+        // Photo display with graceful degradation
+        const photoSection = location.photo_url ? 
+            `<div style="margin-bottom: 0.75rem;">
+                <img src="${location.photo_url}" 
+                     alt="${location.name}" 
+                     style="width: 100%; max-width: 250px; height: auto; border-radius: 6px; object-fit: cover;"
+                     onerror="this.style.display='none';" />
+            </div>` : '';
+        
+        // Historical information section
+        const historicalSection = location.historical_info ? 
+            `<div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
+                <h4 style="margin: 0 0 0.5rem; font-size: 0.9rem; color: #6b7280;">Historical Information</h4>
+                <p style="margin: 0; font-size: 0.85rem; line-height: 1.4;">${location.historical_info}</p>
+            </div>` : '';
+        
         return `
-            <div>
+            <div style="max-width: 280px;">
                 <h3 style="margin: 0 0 0.5rem; font-size: 1.1rem;">${location.name}</h3>
+                ${photoSection}
                 ${categoryLine}
                 ${addressLine}
-                <p style="margin: 0;">${location.description}</p>
+                <p style="margin: 0.5rem 0;">${location.description}</p>
+                ${historicalSection}
             </div>
         `;
     }
@@ -331,6 +367,78 @@
 
         chatForm.addEventListener('submit', sendMessage);
     })();
+
+    // Bookmark functionality
+    {% if user.is_authenticated %}
+    (function() {
+        // Handle bookmark button clicks
+        document.addEventListener('click', async function(e) {
+            if (e.target.closest('.bookmark-btn')) {
+                const bookmarkBtn = e.target.closest('.bookmark-btn');
+                const slug = bookmarkBtn.dataset.slug;
+                const isBookmarked = bookmarkBtn.dataset.bookmarked === 'true';
+                
+                try {
+                    // Get CSRF token
+                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                                    document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
+                    
+                    const response = await fetch(`/api/locations/${slug}/bookmark/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken,
+                        },
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Update button state
+                        bookmarkBtn.dataset.bookmarked = data.bookmarked ? 'true' : 'false';
+                        bookmarkBtn.setAttribute('aria-label', 
+                            data.bookmarked ? `Remove bookmark for ${bookmarkBtn.closest('.location-card').querySelector('.location-title').textContent}` :
+                                            `Bookmark ${bookmarkBtn.closest('.location-card').querySelector('.location-title').textContent}`);
+                        bookmarkBtn.setAttribute('title', 
+                            data.bookmarked ? 'Remove bookmark' : 'Add bookmark');
+                        
+                        // Re-sort location list if needed
+                        setTimeout(() => {
+                            sortLocationsByBookmarks();
+                        }, 100);
+                        
+                    } else {
+                        console.error('Failed to toggle bookmark');
+                    }
+                } catch (error) {
+                    console.error('Error toggling bookmark:', error);
+                }
+            }
+        });
+        
+        // Function to sort locations by bookmark status
+        function sortLocationsByBookmarks() {
+            const locationList = document.getElementById('location-items');
+            const locationCards = Array.from(locationList.querySelectorAll('.location-card'));
+            
+            locationCards.sort((a, b) => {
+                const aBookmarked = a.querySelector('.bookmark-btn')?.dataset.bookmarked === 'true';
+                const bBookmarked = b.querySelector('.bookmark-btn')?.dataset.bookmarked === 'true';
+                const aName = a.querySelector('.location-title').textContent;
+                const bName = b.querySelector('.location-title').textContent;
+                
+                // Bookmarked items first, then alphabetical
+                if (aBookmarked && !bBookmarked) return -1;
+                if (!aBookmarked && bBookmarked) return 1;
+                return aName.localeCompare(bName);
+            });
+            
+            // Re-append sorted cards
+            locationCards.forEach(card => locationList.appendChild(card));
+        }
+    })();
+    {% endif %}
 </script>
 {% if google_maps_api_key %}
 <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initCampusMap" async defer></script>
