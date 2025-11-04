@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Manage Campus Locations</h2>
+<a href="{% url 'campus:add_location' %}" class="btn btn-primary">Add New Location</a>
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Category</th>
+    <th>Actions</th>
+  </tr>
+  {% for loc in locations %}
+  <tr>
+    <td>{{ loc.name }}</td>
+    <td>{{ loc.category }}</td>
+    <td>
+      <a href="{% url 'campus:edit_location' loc.slug %}">Edit</a> |
+      <a href="{% url 'campus:delete_location' loc.slug %}">Delete</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
