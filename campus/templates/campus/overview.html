@@ -18,25 +18,34 @@
             </div>
         </div>
         <div id="location-list-section" class="sidebar-content" aria-live="polite">
-            <p class="sidebar-support-text">Browse campus highlights and tap markers on the map to learn more.</p>
-            <div id="location-items" class="location-list">
+            <div id="location-list-view" class="location-list-view">
+                <p class="sidebar-support-text">Browse campus highlights and tap markers on the map to learn more.</p>
+                <div id="location-items" class="location-list">
                 {% for location in locations %}
                 <article class="location-card"
                     data-name="{{ location.name|lower }}"
                     data-category="{{ location.category|default_if_none:''|lower }}"
                     data-address="{{ location.address|default_if_none:''|lower }}"
                     data-description="{{ location.description|lower }}"
-                    data-slug="{{ location.slug }}">
+                    data-slug="{{ location.slug }}"
+                    data-display-name="{{ location.name|escape }}"
+                    data-display-category="{{ location.category|default:"Campus Highlight"|escape }}"
+                    data-display-address="{{ location.address|default_if_none:''|escape }}"
+                    data-display-description="{{ location.description|escape }}"
+                    data-detail-url="{% url 'campus:location-detail' location.slug %}"
+                    data-image="{% if location.photo %}{{ location.photo.url }}{% elif location.image_url %}{{ location.image_url }}{% endif %}"
+                    data-bookmarked="{% if location.slug in bookmarked_slugs %}true{% else %}false{% endif %}"
+                    role="button"
+                    tabindex="0">
                     <div class="location-card-header">
                         <div>
-                            <a href="{% url 'campus:location-detail' location.slug %}" style="text-decoration: none; color: inherit;">
-                                <h3 class="location-title">{{ location.name }}</h3>
-                            </a>
+                            <h3 class="location-title">{{ location.name }}</h3>
                             <p class="location-meta">{{ location.category|default:"Campus Highlight" }}</p>
                         </div>
                         {% if user.is_authenticated %}
                         <button class="bookmark-btn"
                                 data-slug="{{ location.slug }}"
+                                data-bookmarked="{% if location.slug in bookmarked_slugs %}true{% else %}false{% endif %}"
                                 aria-label="Bookmark {{ location.name }}"
                                 title="{% if location.slug in bookmarked_slugs %}Remove bookmark{% else %}Add bookmark{% endif %}">
                             <svg class="bookmark-icon {% if location.slug in bookmarked_slugs %}bookmarked{% endif %}"
@@ -49,18 +58,51 @@
                     </div>
                 </article>
                 {% endfor %}
+                </div>
+                <p id="location-empty" class="sidebar-empty" hidden>No locations match your search.</p>
             </div>
-            <p id="location-empty" class="sidebar-empty" hidden>No locations match your search.</p>
+            <div id="location-detail-view" class="location-detail-view" hidden>
+                <button type="button" id="location-detail-back" class="location-detail-back" aria-label="Back to locations">← Back to locations</button>
+                <div id="location-detail-content" class="location-detail-content" aria-live="polite"></div>
+            </div>
         </div>
         <div id="tour-list-section" class="sidebar-content" aria-live="polite" hidden>
-            <p class="sidebar-placeholder">Guided tours are coming soon. Stay tuned for curated itineraries!</p>
+            {% if user.is_authenticated %}
+                <div class="tour-list-header">
+                    <a href="{% url 'campus:tour-create' %}" class="create-tour-btn">+ Create Tour</a>
+                </div>
+                <div id="tour-items" class="tour-list">
+                    {% for tour in tours %}
+                    <article class="tour-card" data-tour-id="{{ tour.id }}">
+                        <div class="tour-card-header">
+                            <h3 class="tour-title">{{ tour.name }}</h3>
+                            <div class="tour-card-actions">
+                                <button type="button" class="tour-delete-btn" data-tour-id="{{ tour.id }}" aria-label="Delete tour" title="Delete tour">🗑️</button>
+                                <button type="button" class="tour-toggle" data-tour-id="{{ tour.id }}" aria-label="Toggle tour details">▼</button>
+                            </div>
+                        </div>
+                        <div class="tour-details" id="tour-details-{{ tour.id }}" hidden>
+                            {% if tour.description %}
+                            <p class="tour-description">{{ tour.description }}</p>
+                            {% endif %}
+                            <p class="tour-stops-count">{{ tour.stops.count }} stop{{ tour.stops.count|pluralize }}</p>
+                            <button type="button" class="view-tour-btn" data-tour-id="{{ tour.id }}">View on Map</button>
+                        </div>
+                    </article>
+                    {% empty %}
+                    <p class="sidebar-empty">No tours yet. <a href="{% url 'campus:tour-create' %}">Create your first tour</a>!</p>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="sidebar-placeholder">Please <a href="{% url 'accounts:login' %}">login</a> to create and view tours.</p>
+            {% endif %}
         </div>
     </section>
     <section class="panel map-panel" aria-labelledby="map-heading">
         <header id="map-heading" class="panel-heading">Campus Map</header>
         {% if not google_maps_api_key %}
-        <div style="padding: 1rem;">
-            <p>Map unavailable: missing Google Maps API key.</p>
+        <div style="padding: 1rem; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 4px; margin: 1rem;">
+            <p style="margin: 0; color: #991b1b;"><strong>Map unavailable:</strong> Missing Google Maps API key. Please add <code>GOOGLE_MAP_API_KEY=your_key_here</code> to your .env file and restart the server.</p>
         </div>
         {% endif %}
         <div id="campus-map" class="map-canvas" role="application" aria-label="Georgia Tech campus map">
@@ -190,11 +232,42 @@
         const searchInput = document.getElementById('location-search');
         const locationSection = document.getElementById('location-list-section');
         const toursSection = document.getElementById('tour-list-section');
+        const locationListView = document.getElementById('location-list-view');
+        const locationDetailView = document.getElementById('location-detail-view');
+        const locationDetailContent = document.getElementById('location-detail-content');
+        const locationDetailBack = document.getElementById('location-detail-back');
+        const locationContainer = document.getElementById('location-items');
         const emptyState = document.getElementById('location-empty');
-        const locationItems = Array.from(document.querySelectorAll('#location-items .location-card'));
+        const userIsAuthenticated = {{ user.is_authenticated|yesno:"true,false" }};
+        const loginUrl = "{% url 'accounts:login' %}";
+        const csrfToken = "{{ csrf_token }}";
+        const locationItems = locationContainer ? Array.from(locationContainer.querySelectorAll('.location-card')) : [];
+        let lastFocusedSlug = null;
 
-        if (!viewSelect || !searchInput) {
+        if (!viewSelect || !searchInput || !locationSection || !toursSection || !locationContainer) {
             return;
+        }
+
+        const escapeHtml = (value = '') => String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const formatText = (value = '') => escapeHtml(value).replace(/\n/g, '<br>');
+
+        function updateEmptyState(visibleCount) {
+            if (!emptyState) {
+                return;
+            }
+
+            if (locationListView && locationListView.hidden) {
+                emptyState.hidden = true;
+                return;
+            }
+
+            emptyState.hidden = visibleCount > 0;
         }
 
         function applyFilter() {
@@ -216,7 +289,261 @@
                 }
             });
 
-            emptyState.hidden = visibleCount > 0;
+            updateEmptyState(visibleCount);
+        }
+
+        function reorderLocationCards() {
+            if (!locationContainer) {
+                return;
+            }
+
+            const cards = Array.from(locationContainer.querySelectorAll('.location-card'));
+            const bookmarkedCards = cards.filter((card) => card.dataset.bookmarked === 'true');
+            const unbookmarkedCards = cards.filter((card) => card.dataset.bookmarked !== 'true');
+
+            unbookmarkedCards.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
+
+            locationContainer.innerHTML = '';
+            bookmarkedCards.forEach((card) => locationContainer.appendChild(card));
+            unbookmarkedCards.forEach((card) => locationContainer.appendChild(card));
+
+            const visibleCount = locationItems.reduce((count, item) => count + (item.hidden ? 0 : 1), 0);
+            updateEmptyState(visibleCount);
+        }
+
+        function updateBookmarkUI(slug, isBookmarked, { sourceButton } = {}) {
+            const bookmarkValue = isBookmarked ? 'true' : 'false';
+            const card = locationContainer.querySelector(`.location-card[data-slug="${slug}"]`);
+            const cardName = card?.dataset.displayName || '';
+
+            if (card) {
+                card.dataset.bookmarked = bookmarkValue;
+                const cardButton = card.querySelector('.bookmark-btn');
+                if (cardButton) {
+                    cardButton.dataset.bookmarked = bookmarkValue;
+                    cardButton.title = isBookmarked ? 'Remove bookmark' : 'Add bookmark';
+                    cardButton.setAttribute('aria-label', `${isBookmarked ? 'Remove bookmark for ' : 'Bookmark '}${cardName}`);
+                    const cardIcon = cardButton.querySelector('.bookmark-icon');
+                    if (cardIcon) {
+                        cardIcon.classList.toggle('bookmarked', isBookmarked);
+                    }
+                }
+
+                if (isBookmarked && locationContainer.firstChild !== card) {
+                    locationContainer.insertBefore(card, locationContainer.firstChild);
+                }
+            }
+
+            const detailButton = locationDetailContent.querySelector(`.bookmark-btn[data-slug="${slug}"]`);
+            if (detailButton) {
+                detailButton.dataset.bookmarked = bookmarkValue;
+                detailButton.title = isBookmarked ? 'Remove bookmark' : 'Add bookmark';
+                const detailIcon = detailButton.querySelector('.bookmark-icon');
+                if (detailIcon) {
+                    detailIcon.classList.toggle('bookmarked', isBookmarked);
+                    detailIcon.setAttribute('fill', isBookmarked ? 'currentColor' : 'none');
+                }
+                const label = detailButton.querySelector('.bookmark-label');
+                if (label) {
+                    label.textContent = isBookmarked ? 'Bookmarked' : 'Bookmark';
+                }
+                const detailName = cardName || detailButton.dataset.name || '';
+                detailButton.setAttribute('aria-label', `${isBookmarked ? 'Remove bookmark for ' : 'Bookmark '}${detailName}`);
+            }
+
+            if (sourceButton && sourceButton !== detailButton && (!card || sourceButton !== card.querySelector('.bookmark-btn'))) {
+                const icon = sourceButton.querySelector('.bookmark-icon');
+                if (icon) {
+                    icon.classList.toggle('bookmarked', isBookmarked);
+                    icon.setAttribute('fill', isBookmarked ? 'currentColor' : 'none');
+                }
+                const label = sourceButton.querySelector('.bookmark-label');
+                if (label) {
+                    label.textContent = isBookmarked ? 'Bookmarked' : 'Bookmark';
+                }
+                sourceButton.dataset.bookmarked = bookmarkValue;
+                sourceButton.title = isBookmarked ? 'Remove bookmark' : 'Add bookmark';
+            }
+
+            reorderLocationCards();
+        }
+
+        async function handleBookmarkClick(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const button = event.currentTarget;
+            const slug = button.dataset.slug;
+
+            if (!slug) {
+                return;
+            }
+
+            const wasBookmarked = button.dataset.bookmarked === 'true';
+            const nextState = !wasBookmarked;
+
+            updateBookmarkUI(slug, nextState, { sourceButton: button });
+
+            try {
+                const response = await fetch(`/campus/api/locations/${slug}/bookmark/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to toggle bookmark');
+                }
+            } catch (error) {
+                console.error('Error toggling bookmark:', error);
+                updateBookmarkUI(slug, wasBookmarked, { sourceButton: button });
+            }
+        }
+
+        function attachBookmarkHandler(button) {
+            if (!button || button.dataset.bookmarkAttached === 'true') {
+                return;
+            }
+
+            button.addEventListener('click', handleBookmarkClick);
+            button.dataset.bookmarkAttached = 'true';
+        }
+
+        function buildDetailMarkup(card) {
+            const slug = card.dataset.slug || '';
+            const name = card.dataset.displayName || '';
+            const category = card.dataset.displayCategory || '';
+            const address = card.dataset.displayAddress || '';
+            const description = card.dataset.displayDescription || '';
+            const image = card.dataset.image || '';
+            const detailUrl = card.dataset.detailUrl || '#';
+            const isBookmarked = card.dataset.bookmarked === 'true';
+            const parts = [];
+
+            parts.push(`<article class="location-detail-card" data-slug="${escapeHtml(slug)}">`);
+
+            parts.push('<header class="location-detail-header">');
+            parts.push(`<h3 class="location-detail-title">${escapeHtml(name)}</h3>`);
+            if (category) {
+                parts.push(`<span class="location-detail-category">${escapeHtml(category)}</span>`);
+            }
+            parts.push('</header>');
+
+            if (address) {
+                parts.push('<p class="location-detail-address">');
+                parts.push('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>');
+                parts.push(`<span>${escapeHtml(address)}</span>`);
+                parts.push('</p>');
+            }
+
+            if (image) {
+                parts.push(`<img src="${escapeHtml(image)}" alt="${escapeHtml(name)}" class="location-detail-image" loading="lazy">`);
+            } else {
+                parts.push('<div class="location-detail-image placeholder" role="img" aria-label="No photo available for this location">');
+                parts.push('<span>No photo available</span>');
+                parts.push('</div>');
+            }
+
+            if (description) {
+                parts.push(`<div class="location-detail-info-box">${formatText(description)}</div>`);
+            }
+
+            parts.push('<div class="location-detail-actions">');
+
+            if (userIsAuthenticated) {
+                const ariaLabel = `${isBookmarked ? 'Remove bookmark for ' : 'Bookmark '}${escapeHtml(name)}`;
+                parts.push('<div class="location-detail-action-row">');
+                parts.push(`<button type="button" class="bookmark-btn" data-slug="${escapeHtml(slug)}" data-name="${escapeHtml(name)}" data-bookmarked="${isBookmarked}" aria-label="${ariaLabel}" title="${isBookmarked ? 'Remove bookmark' : 'Add bookmark'}">`);
+                parts.push(`<svg class="bookmark-icon${isBookmarked ? ' bookmarked' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`);
+                parts.push(`<span class="bookmark-label">${isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>`);
+                parts.push('</button>');
+                parts.push(`<button type="button" class="location-detail-navigate-btn" data-slug="${escapeHtml(slug)}" aria-label="Navigate to ${escapeHtml(name)}" title="Navigate to ${escapeHtml(name)}">Navigate</button>`);
+                parts.push('</div>');
+            } else {
+                parts.push(`<p class="location-detail-login">Please <a href="${escapeHtml(loginUrl)}">login</a> to bookmark this location.</p>`);
+            }
+
+            parts.push(`<a class="location-detail-full-link" href="${escapeHtml(detailUrl)}">View full page</a>`);
+            parts.push('</div>');
+            parts.push('</article>');
+
+            return parts.join('');
+        }
+
+        function showLocationList() {
+            if (locationListView) {
+                locationListView.hidden = false;
+                locationListView.setAttribute('aria-hidden', 'false');
+            }
+            if (locationDetailView) {
+                locationDetailView.hidden = true;
+                locationDetailView.dataset.activeSlug = '';
+                locationDetailView.setAttribute('aria-hidden', 'true');
+            }
+            if (locationDetailContent) {
+                locationDetailContent.innerHTML = '';
+            }
+            searchInput.disabled = false;
+            searchInput.placeholder = 'Search locations...';
+            applyFilter();
+
+            if (lastFocusedSlug) {
+                const targetCard = locationContainer.querySelector(`.location-card[data-slug="${lastFocusedSlug}"]`);
+                targetCard?.focus();
+            }
+        }
+
+        function showLocationDetail(card) {
+            if (!locationDetailView || !locationDetailContent || !locationListView) {
+                return;
+            }
+
+            const slug = card.dataset.slug || '';
+            lastFocusedSlug = slug;
+            locationDetailView.dataset.activeSlug = slug;
+            locationDetailContent.innerHTML = buildDetailMarkup(card);
+            locationListView.hidden = true;
+            locationListView.setAttribute('aria-hidden', 'true');
+            locationDetailView.hidden = false;
+            locationDetailView.setAttribute('aria-hidden', 'false');
+            locationDetailView.scrollTop = 0;
+            searchInput.disabled = true;
+            searchInput.placeholder = 'Search disabled while viewing details';
+
+            const detailBookmarkButton = locationDetailContent.querySelector('.bookmark-btn');
+            if (detailBookmarkButton) {
+                attachBookmarkHandler(detailBookmarkButton);
+            }
+
+            const focusTarget = locationDetailContent.querySelector('.bookmark-btn') || locationDetailContent.querySelector('.location-detail-full-link');
+            (focusTarget || locationDetailBack)?.focus();
+
+            updateEmptyState(locationItems.length);
+        }
+
+        function attachCardInteractions(card) {
+            card.addEventListener('click', (event) => {
+                if (event.defaultPrevented) {
+                    return;
+                }
+                if (event.target.closest('button') || event.target.closest('a')) {
+                    return;
+                }
+                showLocationDetail(card);
+            });
+
+            card.addEventListener('keydown', (event) => {
+                const key = event.key;
+                if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+                    if (event.target.closest('button') || event.target.closest('a')) {
+                        return;
+                    }
+                    event.preventDefault();
+                    showLocationDetail(card);
+                }
+            });
         }
 
         function toggleView() {
@@ -225,17 +552,28 @@
             if (view === 'locations') {
                 locationSection.hidden = false;
                 toursSection.hidden = true;
-                searchInput.disabled = false;
-                searchInput.placeholder = 'Search locations...';
-                applyFilter();
+                showLocationList();
             } else {
                 locationSection.hidden = true;
                 toursSection.hidden = false;
                 searchInput.value = '';
                 searchInput.disabled = true;
                 searchInput.placeholder = 'Search disabled for tours';
-                emptyState.hidden = true;
+                updateEmptyState(locationItems.length);
             }
+        }
+
+        locationItems.forEach((item) => {
+            attachCardInteractions(item);
+            const bookmarkButton = item.querySelector('.bookmark-btn');
+            attachBookmarkHandler(bookmarkButton);
+        });
+
+        if (locationDetailBack) {
+            locationDetailBack.addEventListener('click', () => {
+                showLocationList();
+                locationDetailBack.blur();
+            });
         }
 
         viewSelect.addEventListener('change', toggleView);
@@ -378,79 +716,293 @@
     })();
 </script>
 <script>
-    // Bookmark toggle functionality
-    (function() {
-        const bookmarkButtons = document.querySelectorAll('.bookmark-btn');
-        
-        bookmarkButtons.forEach(button => {
-            button.addEventListener('click', async function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const slug = this.dataset.slug;
-                const icon = this.querySelector('.bookmark-icon');
-                const isBookmarked = icon.classList.contains('bookmarked');
-                
-                // Optimistic UI update
-                icon.classList.toggle('bookmarked');
-                this.title = isBookmarked ? 'Add bookmark' : 'Remove bookmark';
-                
-                // Move card to top or restore original position
-                const card = this.closest('.location-card');
-                const container = document.getElementById('location-items');
-                
-                if (!isBookmarked) {
-                    // Moving to top - add to beginning
-                    container.insertBefore(card, container.firstChild);
-                } else {
-                    // Removing bookmark - sort alphabetically with other non-bookmarked
-                    const allCards = Array.from(container.querySelectorAll('.location-card'));
-                    const bookmarkedCards = allCards.filter(c => 
-                        c.querySelector('.bookmark-icon')?.classList.contains('bookmarked')
-                    );
-                    const unbookmarkedCards = allCards.filter(c => 
-                        !c.querySelector('.bookmark-icon')?.classList.contains('bookmarked')
-                    );
-                    
-                    // Sort unbookmarked alphabetically
-                    unbookmarkedCards.sort((a, b) => {
-                        const nameA = a.dataset.name;
-                        const nameB = b.dataset.name;
-                        return nameA.localeCompare(nameB);
-                    });
-                    
-                    // Clear and re-add: bookmarked first, then unbookmarked
-                    container.innerHTML = '';
-                    bookmarkedCards.forEach(c => container.appendChild(c));
-                    unbookmarkedCards.forEach(c => container.appendChild(c));
-                }
-                
-                try {
-                    const response = await fetch(`/campus/api/locations/${slug}/bookmark/`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': '{{ csrf_token }}',
-                            'Content-Type': 'application/json',
-                        },
-                    });
-                    
-                    if (!response.ok) {
-                        // Revert on error
-                        icon.classList.toggle('bookmarked');
-                        this.title = isBookmarked ? 'Remove bookmark' : 'Add bookmark';
-                        console.error('Failed to toggle bookmark');
+    // Tour functionality
+    (function () {
+        // Tour toggle buttons - use event delegation on document so it works even if elements are hidden
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tour-toggle') || e.target.closest('.tour-toggle')) {
+                const btn = e.target.classList.contains('tour-toggle') ? e.target : e.target.closest('.tour-toggle');
+                const tourId = btn.dataset.tourId;
+                if (tourId) {
+                    const detailsEl = document.getElementById(`tour-details-${tourId}`);
+                    if (detailsEl) {
+                        const isHidden = detailsEl.hidden;
+                        detailsEl.hidden = !isHidden;
+                        btn.textContent = isHidden ? '▲' : '▼';
                     }
-                } catch (error) {
-                    // Revert on error
-                    icon.classList.toggle('bookmarked');
-                    this.title = isBookmarked ? 'Remove bookmark' : 'Add bookmark';
-                    console.error('Error toggling bookmark:', error);
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+        });
+
+        // Tour delete button handler
+        document.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('tour-delete-btn') || e.target.closest('.tour-delete-btn')) {
+                const btn = e.target.classList.contains('tour-delete-btn') ? e.target : e.target.closest('.tour-delete-btn');
+                const tourId = btn.dataset.tourId;
+                if (tourId) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Confirm deletion
+                    const tourCard = btn.closest('.tour-card');
+                    const tourName = tourCard.querySelector('.tour-title')?.textContent || 'this tour';
+                    
+                    if (!confirm(`Are you sure you want to delete "${tourName}"? This action cannot be undone.`)) {
+                        return;
+                    }
+
+                    // Disable button during deletion
+                    btn.disabled = true;
+                    btn.textContent = '...';
+
+                    try {
+                        // Get CSRF token
+                        const getCsrfToken = () => {
+                            const token = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+                            if (token) return token;
+                            const cookies = document.cookie.split(';');
+                            for (let cookie of cookies) {
+                                const [name, value] = cookie.trim().split('=');
+                                if (name === 'csrftoken') return decodeURIComponent(value);
+                            }
+                            return '';
+                        };
+
+                        const response = await fetch(`/campus/api/tours/${tourId}/`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRFToken': getCsrfToken()
+                            }
+                        });
+
+                        if (response.ok) {
+                            // Clear route if this tour was displayed
+                            if (currentTourRoute === parseInt(tourId)) {
+                                clearTourRoute();
+                            }
+                            
+                            // Remove tour card from DOM
+                            tourCard.remove();
+
+                            // Check if no tours left
+                            const tourList = document.getElementById('tour-items');
+                            if (tourList && tourList.children.length === 0) {
+                                tourList.innerHTML = '<p class="sidebar-empty">No tours yet. <a href="{% url "campus:tour-create" %}">Create your first tour</a>!</p>';
+                            }
+                        } else {
+                            const data = await response.json();
+                            alert(data.error || 'Failed to delete tour. Please try again.');
+                            btn.disabled = false;
+                            btn.textContent = '🗑️';
+                        }
+                    } catch (error) {
+                        console.error('Error deleting tour:', error);
+                        alert('An error occurred while deleting the tour. Please try again.');
+                        btn.disabled = false;
+                        btn.textContent = '🗑️';
+                    }
+                }
+            }
+        });
+
+        // Tour functionality for maps
+        let directionsService = null;
+        let directionsRenderer = null;
+        let currentTourRoute = null;
+        let tourMarkers = [];
+
+        function initTourFunctionality() {
+            if (typeof google === 'undefined' || !google.maps) {
+                return;
+            }
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true, // We'll use custom numbered markers
+                polylineOptions: {
+                    strokeColor: '#0066cc',
+                    strokeWeight: 4,
+                    strokeOpacity: 0.8
                 }
             });
-        });
+
+            // View on map buttons
+            document.querySelectorAll('.view-tour-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const tourId = parseInt(e.target.dataset.tourId);
+                    await displayTourOnMap(tourId);
+                });
+            });
+
+            // Add clear route button if tours are displayed
+            const tourSection = document.getElementById('tour-list-section');
+            if (tourSection && !document.getElementById('clear-route-btn')) {
+                const clearBtn = document.createElement('button');
+                clearBtn.id = 'clear-route-btn';
+                clearBtn.className = 'clear-route-btn';
+                clearBtn.textContent = 'Clear Route';
+                clearBtn.style.display = 'none';
+                clearBtn.addEventListener('click', clearTourRoute);
+                const tourListHeader = tourSection.querySelector('.tour-list-header');
+                if (tourListHeader) {
+                    tourListHeader.appendChild(clearBtn);
+                }
+            }
+        }
+
+        async function displayTourOnMap(tourId) {
+            if (!map || !directionsService || !directionsRenderer) {
+                alert('Map is not ready. Please wait a moment and try again.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`{% url 'campus:tour-list' %}`);
+                const data = await response.json();
+                const tour = data.tours.find(t => t.id === tourId);
+
+                if (!tour || !tour.stops || tour.stops.length === 0) {
+                    alert('Tour not found or has no stops.');
+                    return;
+                }
+
+                // Clear previous route
+                clearTourRoute();
+
+                // Sort stops by order
+                const sortedStops = tour.stops.sort((a, b) => a.order - b.order);
+
+                if (sortedStops.length === 1) {
+                    // Single stop - just show marker
+                    const stop = sortedStops[0];
+                    const position = {
+                        lat: stop.location.latitude,
+                        lng: stop.location.longitude
+                    };
+                    createNumberedMarker(position, 1, stop.location.name);
+                    map.setCenter(position);
+                    map.setZoom(18);
+                    return;
+                }
+
+                // Multiple stops - create route
+                const waypoints = sortedStops.slice(1, -1).map(stop => ({
+                    location: {
+                        lat: stop.location.latitude,
+                        lng: stop.location.longitude
+                    },
+                    stopover: true
+                }));
+
+                const origin = {
+                    lat: sortedStops[0].location.latitude,
+                    lng: sortedStops[0].location.longitude
+                };
+
+                const destination = {
+                    lat: sortedStops[sortedStops.length - 1].location.latitude,
+                    lng: sortedStops[sortedStops.length - 1].location.longitude
+                };
+
+                directionsService.route({
+                    origin: origin,
+                    destination: destination,
+                    waypoints: waypoints,
+                    travelMode: google.maps.TravelMode.WALKING,
+                    optimizeWaypoints: false
+                }, (result, status) => {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(result);
+                        directionsRenderer.setMap(map);
+                        currentTourRoute = tourId;
+
+                        // Add numbered markers for each stop
+                        sortedStops.forEach((stop, index) => {
+                            const position = {
+                                lat: stop.location.latitude,
+                                lng: stop.location.longitude
+                            };
+                            createNumberedMarker(position, index + 1, stop.location.name);
+                        });
+
+                        // Show clear button
+                        const clearBtn = document.getElementById('clear-route-btn');
+                        if (clearBtn) {
+                            clearBtn.style.display = 'block';
+                        }
+                    } else {
+                        console.error('Directions request failed:', status);
+                        alert('Unable to calculate route. Please try again.');
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching tour:', error);
+                alert('Error loading tour. Please try again.');
+            }
+        }
+
+        function createNumberedMarker(position, number, title) {
+            const marker = new google.maps.Marker({
+                position: position,
+                map: map,
+                title: title,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 12,
+                    fillColor: '#003057',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                    labelOrigin: new google.maps.Point(0, 0)
+                },
+                label: {
+                    text: number.toString(),
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                }
+            });
+            tourMarkers.push(marker);
+        }
+
+        function clearTourRoute() {
+            if (directionsRenderer) {
+                directionsRenderer.setDirections({ routes: [] });
+                directionsRenderer.setMap(null);
+            }
+            
+            // Remove all tour markers
+            tourMarkers.forEach(marker => marker.setMap(null));
+            tourMarkers = [];
+            
+            currentTourRoute = null;
+
+            // Hide clear button
+            const clearBtn = document.getElementById('clear-route-btn');
+            if (clearBtn) {
+                clearBtn.style.display = 'none';
+            }
+        }
+
+        // Initialize tour functionality after map is loaded
+        if (typeof window.initCampusMap !== 'undefined') {
+            const originalInit = window.initCampusMap;
+            window.initCampusMap = function() {
+                originalInit();
+                // Wait a bit for map to fully initialize
+                setTimeout(initTourFunctionality, 500);
+            };
+        } else {
+            // If map loads before this script, wait for it
+            window.addEventListener('load', () => {
+                setTimeout(initTourFunctionality, 1000);
+            });
+        }
     })();
 </script>
 {% if google_maps_api_key %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initCampusMap" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initCampusMap" async defer></script>
 {% endif %}
 {% endblock %}

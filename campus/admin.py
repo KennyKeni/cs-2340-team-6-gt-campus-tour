@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Location, Bookmark
+from .models import Location, Bookmark, Tour, TourStop
 
 
 @admin.register(Location)
@@ -47,3 +47,17 @@ class BookmarkAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'location__name')
     readonly_fields = ('created_at',)
     ordering = ('-created_at',)
+
+
+@admin.register(Tour)
+class TourAdmin(admin.ModelAdmin):
+    list_display = ('name', 'user', 'created_at')
+    search_fields = ('name', 'description', 'user__username')
+    list_filter = ('created_at',)
+
+
+@admin.register(TourStop)
+class TourStopAdmin(admin.ModelAdmin):
+    list_display = ('tour', 'location', 'order')
+    list_filter = ('tour',)
+    search_fields = ('tour__name', 'location__name')

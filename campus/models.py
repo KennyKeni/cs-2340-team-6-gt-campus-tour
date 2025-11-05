@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
@@ -104,3 +105,29 @@ class Bookmark(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.username} → {self.location.name}"
+
+
+class Tour(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class TourStop(models.Model):
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='stops')
+    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+    order = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ['order']
+        unique_together = [['tour', 'location']]
+
+    def __str__(self) -> str:
+        return f"{self.tour.name} - {self.location.name} (#{self.order})"
