@@ -46,6 +46,22 @@ body {
     text-decoration: underline;
 }
 
+.site-header nav .logout-button {
+    background: none;
+    border: none;
+    color: #f8fafc;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0;
+}
+
+.site-header nav .logout-button:hover {
+    text-decoration: underline;
+}
+
 .site-header nav .nav-button {
     display: inline-flex;
     align-items: center;
@@ -269,10 +285,14 @@ main {
 }
 
 @keyframes typingBlink {
-    0%, 80%, 100% {
+
+    0%,
+    80%,
+    100% {
         opacity: 0.2;
         transform: translateY(0);
     }
+
     40% {
         opacity: 1;
         transform: translateY(-2px);
@@ -380,6 +400,130 @@ main {
     }
 }
 
+/* Authentication Styles */
+.auth-container {
+    max-width: 480px;
+    margin: 2rem auto;
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    padding: 2rem;
+}
+
+.auth-container h2 {
+    margin: 0 0 0.5rem;
+    color: #003057;
+    font-size: 1.75rem;
+}
+
+.auth-container>p {
+    margin: 0 0 1.5rem;
+    color: #475569;
+    font-size: 0.95rem;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.95rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    padding: 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: border-color 0.2s ease-in-out;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="password"]:focus {
+    outline: none;
+    border-color: #003057;
+}
+
+.help-text {
+    display: block;
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.error-messages {
+    background-color: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.error {
+    color: #dc2626;
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+}
+
+.error:last-child {
+    margin-bottom: 0;
+}
+
+.btn-primary {
+    padding: 0.85rem 1.5rem;
+    background-color: #003057;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+}
+
+.btn-primary:hover {
+    background-color: #00467f;
+}
+
+.btn-primary:active {
+    transform: translateY(1px);
+}
+
+.auth-switch {
+    margin-top: 1.5rem;
+    text-align: center;
+    color: #475569;
+    font-size: 0.95rem;
+}
+
+.auth-switch a {
+    color: #003057;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-switch a:hover {
+    text-decoration: underline;
+}
+
+.user-info {
+    color: #fbbf24;
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
 @media (max-width: 768px) {
     .site-header {
         flex-direction: column;
@@ -393,5 +537,10 @@ main {
 
     .chat-input button {
         width: 100%;
+    }
+
+    .auth-container {
+        margin: 1rem;
+        padding: 1.5rem;
     }
 }
