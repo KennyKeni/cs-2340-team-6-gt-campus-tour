@@ -188,6 +188,13 @@ main {
     box-shadow: 0 4px 12px rgba(30, 64, 175, 0.14);
 }
 
+.location-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
 .location-title {
     margin: 0;
     font-size: 1.05rem;
@@ -200,6 +207,33 @@ main {
     font-size: 0.82rem;
     color: #1d4ed8;
     font-weight: 500;
+}
+
+.bookmark-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+    flex-shrink: 0;
+}
+
+.bookmark-btn:hover {
+    color: #fbbf24;
+    transform: scale(1.1);
+}
+
+.bookmark-icon {
+    transition: all 0.2s ease-in-out;
+}
+
+.bookmark-icon.bookmarked {
+    fill: #fbbf24;
+    color: #fbbf24;
 }
 
 .sidebar-empty,

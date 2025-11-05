@@ -3,6 +3,7 @@ from json import JSONDecodeError
 from typing import List
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import user_passes_test
@@ -10,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from .ai import CampusAiError, ChatMessage, get_landmark_context, run_landmark_chat
-from .models import Location
+from .models import Location, Bookmark
 from .forms import LocationForm
 
 
@@ -19,7 +20,20 @@ from .forms import LocationForm
 # -------------------------------------------------------------------------
 def campus_overview(request):
     """Renders interactive campus map with all known locations."""
+    # Get all locations
     locations = Location.objects.all()
+    
+    # Get user's bookmarked location slugs if authenticated
+    bookmarked_slugs = set()
+    if request.user.is_authenticated:
+        bookmarked_slugs = set(
+            Bookmark.objects.filter(user=request.user).values_list('location__slug', flat=True)
+        )
+    
+    # Sort locations: bookmarked first, then alphabetically
+    locations_list = list(locations)
+    locations_list.sort(key=lambda loc: (loc.slug not in bookmarked_slugs, loc.name))
+    
     locations_payload = [
         {
             'name': location.name,
@@ -32,12 +46,14 @@ def campus_overview(request):
             'category': location.category,
             'image_url': location.image_url,
             'photo': location.photo.url if location.photo else None,
+            'is_bookmarked': location.slug in bookmarked_slugs,
         }
-        for location in locations
+        for location in locations_list
     ]
     context = {
-        'locations': locations,
+        'locations': locations_list,
         'locations_payload': locations_payload,
+        'bookmarked_slugs': list(bookmarked_slugs),
         'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
         'map_center': {'lat': 33.7780, 'lng': -84.3980},
     }
@@ -155,3 +171,25 @@ def delete_location(request, slug):
         location.delete()
         return redirect('manage_locations')
     return render(request, 'campus/confirm_delete.html', {'location': location})
+
+
+# -------------------------------------------------------------------------
+#  BOOKMARK VIEWS (User Story #8)
+# -------------------------------------------------------------------------
+@login_required
+@require_POST
+def toggle_bookmark(request, slug):
+    """Toggle bookmark status for a location."""
+    location = get_object_or_404(Location, slug=slug)
+    
+    # Check if bookmark already exists
+    bookmark = Bookmark.objects.filter(user=request.user, location=location).first()
+    
+    if bookmark:
+        # Remove bookmark
+        bookmark.delete()
+        return JsonResponse({'bookmarked': False, 'message': 'Bookmark removed'})
+    else:
+        # Add bookmark
+        Bookmark.objects.create(user=request.user, location=location)
+        return JsonResponse({'bookmarked': True, 'message': 'Bookmark added'})

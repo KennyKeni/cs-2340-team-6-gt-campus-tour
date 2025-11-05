@@ -10,6 +10,11 @@ urlpatterns = [
     path('api/chat/', views.chat_with_assistant, name='chat'),
 
     # ---------------------------------------------------------------------
+    # Bookmark endpoints (User Story #8)
+    # ---------------------------------------------------------------------
+    path('api/locations/<slug:slug>/bookmark/', views.toggle_bookmark, name='toggle-bookmark'),
+
+    # ---------------------------------------------------------------------
     # New admin CRUD endpoints (User Story #12 – Shashwat)
     # ---------------------------------------------------------------------
     path('manage/', views.manage_locations, name='manage_locations'),
