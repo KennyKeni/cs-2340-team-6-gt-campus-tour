@@ -3,15 +3,14 @@ from json import JSONDecodeError
 from typing import List
 
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import user_passes_test
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .ai import CampusAiError, ChatMessage, get_landmark_context, run_landmark_chat
-from .models import Location, Bookmark
+from .models import Location, Bookmark, Tour, TourStop
 from .forms import LocationForm
 
 
@@ -50,14 +49,48 @@ def campus_overview(request):
         }
         for location in locations_list
     ]
+    
+    # Get user's tours if authenticated
+    tours = []
+    if request.user.is_authenticated:
+        tours = Tour.objects.filter(user=request.user).prefetch_related('stops__location')
+    
+    # Get API key from settings
+    api_key = settings.GOOGLE_MAP_API_KEY
+    
     context = {
         'locations': locations_list,
         'locations_payload': locations_payload,
         'bookmarked_slugs': list(bookmarked_slugs),
+        'tours': tours,
         'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
         'map_center': {'lat': 33.7780, 'lng': -84.3980},
     }
     return render(request, 'campus/overview.html', context)
+
+
+@login_required
+def tour_create(request):
+    """Render the tour creation page."""
+    locations = Location.objects.all()
+    locations_payload = [
+        {
+            'id': location.id,
+            'name': location.name,
+            'slug': location.slug,
+            'description': location.description,
+            'latitude': float(location.latitude),
+            'longitude': float(location.longitude),
+            'address': location.address,
+            'category': location.category,
+        }
+        for location in locations
+    ]
+    context = {
+        'locations': locations,
+        'locations_payload': locations_payload,
+    }
+    return render(request, 'campus/tour_create.html', context)
 
 
 @require_GET
@@ -213,3 +246,196 @@ def toggle_bookmark(request, slug):
         # Add bookmark
         Bookmark.objects.create(user=request.user, location=location)
         return JsonResponse({'bookmarked': True, 'message': 'Bookmark added'})
+
+
+# -------------------------------------------------------------------------
+#  TOUR VIEWS (User Story #7)
+# -------------------------------------------------------------------------
+@csrf_exempt
+@login_required
+def tour_list(request):
+    """List all tours for the authenticated user with their stops (GET) or create a new tour (POST)."""
+    if request.method == 'GET':
+        tours = Tour.objects.filter(user=request.user).prefetch_related('stops__location')
+        data = []
+        for tour in tours:
+            stops = []
+            for stop in tour.stops.all():
+                stops.append({
+                    'id': stop.id,
+                    'location_id': stop.location.id,
+                    'order': stop.order,
+                    'location': {
+                        'id': stop.location.id,
+                        'name': stop.location.name,
+                        'slug': stop.location.slug,
+                        'description': stop.location.description,
+                        'latitude': float(stop.location.latitude),
+                        'longitude': float(stop.location.longitude),
+                        'address': stop.location.address,
+                        'category': stop.location.category,
+                    }
+                })
+            data.append({
+                'id': tour.id,
+                'name': tour.name,
+                'description': tour.description,
+                'created_at': tour.created_at.isoformat(),
+                'stops': stops,
+            })
+        return JsonResponse({'tours': data})
+    elif request.method == 'POST':
+        """Create a new tour for the authenticated user."""
+        try:
+            payload = json.loads(request.body)
+        except JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'Tour name is required.'}, status=400)
+
+        description = (payload.get('description') or '').strip()
+        location_ids = payload.get('location_ids', [])
+
+        if not isinstance(location_ids, list):
+            return JsonResponse({'error': 'location_ids must be an array.'}, status=400)
+
+        if not location_ids:
+            return JsonResponse({'error': 'At least one location is required.'}, status=400)
+
+        # Validate that all locations exist
+        locations = Location.objects.filter(id__in=location_ids)
+        if locations.count() != len(location_ids):
+            return JsonResponse({'error': 'One or more locations not found.'}, status=400)
+
+        # Create tour
+        tour = Tour.objects.create(
+            user=request.user,
+            name=name,
+            description=description,
+        )
+
+        # Create tour stops in order
+        for order, location_id in enumerate(location_ids, start=1):
+            location = locations.get(id=location_id)
+            TourStop.objects.create(
+                tour=tour,
+                location=location,
+                order=order,
+            )
+
+        # Return created tour with stops
+        stops = []
+        for stop in tour.stops.all():
+            stops.append({
+                'id': stop.id,
+                'location_id': stop.location.id,
+                'order': stop.order,
+                'location': {
+                    'id': stop.location.id,
+                    'name': stop.location.name,
+                    'slug': stop.location.slug,
+                    'description': stop.location.description,
+                    'latitude': float(stop.location.latitude),
+                    'longitude': float(stop.location.longitude),
+                    'address': stop.location.address,
+                    'category': stop.location.category,
+                }
+            })
+
+        return JsonResponse({
+            'id': tour.id,
+            'name': tour.name,
+            'description': tour.description,
+            'created_at': tour.created_at.isoformat(),
+            'stops': stops,
+        }, status=201)
+    else:
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+
+@csrf_exempt
+@login_required
+def tour_detail(request, tour_id):
+    """Update (PUT) or delete (DELETE) a tour."""
+    tour = get_object_or_404(Tour, id=tour_id)
+
+    # Check ownership
+    if tour.user != request.user:
+        return JsonResponse({'error': 'You do not have permission to modify this tour.'}, status=403)
+
+    if request.method == 'PUT':
+        """Update an existing tour (name, description, and all stops with ordering)."""
+        try:
+            payload = json.loads(request.body)
+        except JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+        name = (payload.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'Tour name is required.'}, status=400)
+
+        description = (payload.get('description') or '').strip()
+        location_ids = payload.get('location_ids', [])
+
+        if not isinstance(location_ids, list):
+            return JsonResponse({'error': 'location_ids must be an array.'}, status=400)
+
+        if not location_ids:
+            return JsonResponse({'error': 'At least one location is required.'}, status=400)
+
+        # Validate that all locations exist
+        locations = Location.objects.filter(id__in=location_ids)
+        if locations.count() != len(location_ids):
+            return JsonResponse({'error': 'One or more locations not found.'}, status=400)
+
+        # Update tour basic info
+        tour.name = name
+        tour.description = description
+        tour.save()
+
+        # Delete existing stops
+        tour.stops.all().delete()
+
+        # Create new stops in order
+        for order, location_id in enumerate(location_ids, start=1):
+            location = locations.get(id=location_id)
+            TourStop.objects.create(
+                tour=tour,
+                location=location,
+                order=order,
+            )
+
+        # Return updated tour with stops
+        stops = []
+        for stop in tour.stops.all():
+            stops.append({
+                'id': stop.id,
+                'location_id': stop.location.id,
+                'order': stop.order,
+                'location': {
+                    'id': stop.location.id,
+                    'name': stop.location.name,
+                    'slug': stop.location.slug,
+                    'description': stop.location.description,
+                    'latitude': float(stop.location.latitude),
+                    'longitude': float(stop.location.longitude),
+                    'address': stop.location.address,
+                    'category': stop.location.category,
+                }
+            })
+
+        return JsonResponse({
+            'id': tour.id,
+            'name': tour.name,
+            'description': tour.description,
+            'created_at': tour.created_at.isoformat(),
+            'stops': stops,
+        })
+    elif request.method == 'DELETE':
+        """Delete a tour."""
+        tour.delete()
+        return JsonResponse({'success': True}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
