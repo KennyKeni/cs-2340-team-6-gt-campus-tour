@@ -8,4 +8,16 @@ wheels/
 
 # Virtual environments
 .venv
+venv/
 .env
+
+# Database
+db.sqlite3
+*.db
+*.sqlite
+*.sqlite3
+
+# Django migrations
+*/migrations/*.py
+!*/migrations/__init__.py
+**/migrations/__pycache__/
