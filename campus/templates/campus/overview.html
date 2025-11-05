@@ -29,16 +29,18 @@
                     data-slug="{{ location.slug }}">
                     <div class="location-card-header">
                         <div>
-                            <h3 class="location-title">{{ location.name }}</h3>
+                            <a href="{% url 'campus:location-detail' location.slug %}" style="text-decoration: none; color: inherit;">
+                                <h3 class="location-title">{{ location.name }}</h3>
+                            </a>
                             <p class="location-meta">{{ location.category|default:"Campus Highlight" }}</p>
                         </div>
                         {% if user.is_authenticated %}
-                        <button class="bookmark-btn" 
+                        <button class="bookmark-btn"
                                 data-slug="{{ location.slug }}"
                                 aria-label="Bookmark {{ location.name }}"
                                 title="{% if location.slug in bookmarked_slugs %}Remove bookmark{% else %}Add bookmark{% endif %}">
-                            <svg class="bookmark-icon {% if location.slug in bookmarked_slugs %}bookmarked{% endif %}" 
-                                 width="20" height="20" viewBox="0 0 24 24" 
+                            <svg class="bookmark-icon {% if location.slug in bookmarked_slugs %}bookmarked{% endif %}"
+                                 width="20" height="20" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                             </svg>

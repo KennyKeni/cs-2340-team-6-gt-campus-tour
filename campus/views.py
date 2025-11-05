@@ -174,6 +174,26 @@ def delete_location(request, slug):
 
 
 # -------------------------------------------------------------------------
+#  LOCATION DETAIL VIEW (User Story #9)
+# -------------------------------------------------------------------------
+def location_detail(request, slug):
+    """Display detailed information about a specific location."""
+    location = get_object_or_404(Location, slug=slug)
+
+    # Check if user has bookmarked this location
+    is_bookmarked = False
+    if request.user.is_authenticated:
+        is_bookmarked = Bookmark.objects.filter(user=request.user, location=location).exists()
+
+    context = {
+        'location': location,
+        'is_bookmarked': is_bookmarked,
+        'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
+    }
+    return render(request, 'campus/location_detail.html', context)
+
+
+# -------------------------------------------------------------------------
 #  BOOKMARK VIEWS (User Story #8)
 # -------------------------------------------------------------------------
 @login_required
@@ -181,10 +201,10 @@ def delete_location(request, slug):
 def toggle_bookmark(request, slug):
     """Toggle bookmark status for a location."""
     location = get_object_or_404(Location, slug=slug)
-    
+
     # Check if bookmark already exists
     bookmark = Bookmark.objects.filter(user=request.user, location=location).first()
-    
+
     if bookmark:
         # Remove bookmark
         bookmark.delete()

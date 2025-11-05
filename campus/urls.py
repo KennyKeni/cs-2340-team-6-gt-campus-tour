@@ -10,6 +10,11 @@ urlpatterns = [
     path('api/chat/', views.chat_with_assistant, name='chat'),
 
     # ---------------------------------------------------------------------
+    # Location detail page (User Story #9)
+    # ---------------------------------------------------------------------
+    path('locations/<slug:slug>/', views.location_detail, name='location-detail'),
+
+    # ---------------------------------------------------------------------
     # Bookmark endpoints (User Story #8)
     # ---------------------------------------------------------------------
     path('api/locations/<slug:slug>/bookmark/', views.toggle_bookmark, name='toggle-bookmark'),
