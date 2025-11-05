@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Location
+from .models import Location, Bookmark
 
 
 @admin.register(Location)
@@ -38,3 +38,12 @@ class LocationAdmin(admin.ModelAdmin):
         return 'No photo'
 
     thumbnail.short_description = 'Photo'
+
+
+@admin.register(Bookmark)
+class BookmarkAdmin(admin.ModelAdmin):
+    list_display = ('user', 'location', 'created_at')
+    list_filter = ('created_at', 'user')
+    search_fields = ('user__username', 'location__name')
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)

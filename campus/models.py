@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.utils.text import slugify
 
 
@@ -72,3 +73,34 @@ class Location(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+
+
+class Bookmark(models.Model):
+    """
+    Represents a user's bookmarked campus location.
+    Allows visitors to save locations for quick access.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='bookmarks',
+        help_text="The user who bookmarked this location.",
+    )
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.CASCADE,
+        related_name='bookmarks',
+        help_text="The location that was bookmarked.",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this bookmark was created.",
+    )
+
+    class Meta:
+        unique_together = ['user', 'location']
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.user.username} → {self.location.name}"

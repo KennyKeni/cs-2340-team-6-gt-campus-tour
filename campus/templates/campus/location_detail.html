@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location.name }} | GT Tour{% endblock %}
+
+{% block content %}
+<div class="location-detail-container" style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+    <div class="location-header" style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <h1 style="margin: 0 0 0.5rem 0;">{{ location.name }}</h1>
+                {% if location.category %}
+                <p style="color: #666; margin: 0;"><strong>Category:</strong> {{ location.category }}</p>
+                {% endif %}
+            </div>
+            {% if user.is_authenticated %}
+            <button class="bookmark-btn"
+                    data-slug="{{ location.slug }}"
+                    style="padding: 0.75rem 1.5rem; background: #003057; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">
+                <svg class="bookmark-icon {% if is_bookmarked %}bookmarked{% endif %}"
+                     width="20" height="20" viewBox="0 0 24 24"
+                     fill="{% if is_bookmarked %}currentColor{% else %}none{% endif %}"
+                     stroke="currentColor" stroke-width="2"
+                     style="vertical-align: middle; margin-right: 0.5rem;">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>{% if is_bookmarked %}Bookmarked{% else %}Bookmark{% endif %}</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="location-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <div class="location-info">
+            {% if location.photo or location.image_url %}
+            <div class="location-photo" style="margin-bottom: 2rem;">
+                <img src="{% if location.photo %}{{ location.photo.url }}{% else %}{{ location.image_url }}{% endif %}"
+                     alt="{{ location.name }}"
+                     style="width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+                     onerror="this.parentElement.style.display='none';">
+            </div>
+            {% endif %}
+
+            <div class="description" style="margin-bottom: 2rem;">
+                <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">About</h2>
+                <p style="line-height: 1.6; color: #333;">{{ location.description }}</p>
+            </div>
+
+            {% if location.historical_info %}
+            <div class="historical-info" style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-left: 4px solid #003057; border-radius: 4px;">
+                <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: #003057;">Historical Information</h2>
+                <p style="line-height: 1.6; color: #333;">{{ location.historical_info }}</p>
+            </div>
+            {% endif %}
+
+            {% if location.address %}
+            <div class="address" style="margin-bottom: 2rem;">
+                <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Location</h2>
+                <p style="line-height: 1.6; color: #333;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    {{ location.address }}
+                </p>
+            </div>
+            {% endif %}
+
+            <div class="actions" style="margin-top: 2rem;">
+                <a href="{% url 'campus:overview' %}" style="display: inline-block; padding: 0.75rem 1.5rem; background: #f0f0f0; color: #333; text-decoration: none; border-radius: 4px; margin-right: 1rem;">
+                    ← Back to Map
+                </a>
+                {% if location.latitude and location.longitude %}
+                <a href="https://www.google.com/maps/dir/?api=1&destination={{ location.latitude }},{{ location.longitude }}"
+                   target="_blank"
+                   style="display: inline-block; padding: 0.75rem 1.5rem; background: #003057; color: white; text-decoration: none; border-radius: 4px;">
+                    Get Directions →
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="location-map">
+            {% if google_maps_api_key %}
+            <div id="detail-map" style="width: 100%; height: 500px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
+            {% else %}
+            <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                <p>Map unavailable: missing Google Maps API key.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.bookmark-btn:hover {
+    background: #002244 !important;
+}
+.bookmark-icon.bookmarked {
+    fill: #fbbf24;
+}
+</style>
+
+<script>
+{% if google_maps_api_key %}
+window.initDetailMap = function() {
+    const map = new google.maps.Map(document.getElementById('detail-map'), {
+        center: { lat: {{ location.latitude }}, lng: {{ location.longitude }} },
+        zoom: 17,
+        styles: [
+            { featureType: 'poi', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+            { featureType: 'poi', elementType: 'labels.text', stylers: [{ visibility: 'off' }] },
+        ],
+    });
+
+    new google.maps.Marker({
+        position: { lat: {{ location.latitude }}, lng: {{ location.longitude }} },
+        map: map,
+        title: '{{ location.name }}',
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#fbbf24',
+            fillOpacity: 1,
+            strokeColor: '#003057',
+            strokeWeight: 3,
+        },
+    });
+};
+{% endif %}
+
+// Bookmark toggle functionality
+{% if user.is_authenticated %}
+document.querySelector('.bookmark-btn').addEventListener('click', async function(e) {
+    e.preventDefault();
+
+    const slug = this.dataset.slug;
+    const icon = this.querySelector('.bookmark-icon');
+    const text = this.querySelector('span');
+    const isBookmarked = icon.classList.contains('bookmarked');
+
+    try {
+        const response = await fetch(`/campus/api/locations/${slug}/bookmark/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.ok) {
+            icon.classList.toggle('bookmarked');
+            if (isBookmarked) {
+                icon.setAttribute('fill', 'none');
+                text.textContent = 'Bookmark';
+            } else {
+                icon.setAttribute('fill', 'currentColor');
+                text.textContent = 'Bookmarked';
+            }
+        }
+    } catch (error) {
+        console.error('Error toggling bookmark:', error);
+    }
+});
+{% endif %}
+</script>
+
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initDetailMap" async defer></script>
+{% endif %}
+
+{% endblock %}
