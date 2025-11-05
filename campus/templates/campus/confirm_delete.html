@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Delete {{ location.name }}?</h2>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">Confirm</button>
+  <a href="{% url 'campus:manage_locations' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}
