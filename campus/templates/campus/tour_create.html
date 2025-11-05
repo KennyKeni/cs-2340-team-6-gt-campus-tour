@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+
+{% block title %}Create Tour | GT Tour{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Override base styles to allow scrolling on tour creation page */
+    body {
+        overflow: auto !important;
+    }
+    main {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        height: auto !important;
+        min-height: calc(100vh - 80px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tour-create-container">
+    <header class="tour-create-header">
+        <h1>Create New Tour</h1>
+        <a href="{% url 'campus:overview' %}" class="back-link">← Back to Campus Map</a>
+    </header>
+
+    <form id="tour-create-form" class="tour-form">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="tour-name">Tour Name *</label>
+            <input type="text" id="tour-name" name="name" required placeholder="Enter tour name...">
+        </div>
+
+        <div class="form-group">
+            <label for="tour-description">Description</label>
+            <textarea id="tour-description" name="description" rows="3" placeholder="Describe your tour..."></textarea>
+        </div>
+
+        <div class="tour-stops-section">
+            <h2>Tour Stops</h2>
+            
+            <div class="location-selector">
+                <label for="location-search">Search and Add Locations</label>
+                <input type="search" id="location-search" placeholder="Search locations..." autocomplete="off">
+                <div id="location-results" class="location-results"></div>
+            </div>
+
+            <div class="selected-stops">
+                <h3>Selected Stops <span id="stop-count">(0)</span></h3>
+                <p class="help-text">Click and drag to reorder, or use up/down buttons</p>
+                <ul id="selected-stops-list" class="stops-list"></ul>
+                <p id="no-stops-message" class="empty-message">No stops added yet. Search and add locations above.</p>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" id="cancel-btn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" id="save-btn" class="btn btn-primary" disabled>Save Tour</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+{{ locations_payload|json_script:"location-data" }}
+<script>
+    (function() {
+        const locationData = JSON.parse(document.getElementById('location-data').textContent);
+        const searchInput = document.getElementById('location-search');
+        const locationResults = document.getElementById('location-results');
+        const selectedStopsList = document.getElementById('selected-stops-list');
+        const stopCountSpan = document.getElementById('stop-count');
+        const noStopsMessage = document.getElementById('no-stops-message');
+        const tourForm = document.getElementById('tour-create-form');
+        const saveBtn = document.getElementById('save-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+
+        let selectedStops = [];
+        let draggedElement = null;
+
+        function filterLocations(query) {
+            const lowerQuery = query.toLowerCase();
+            return locationData.filter(loc => {
+                const haystack = [
+                    loc.name,
+                    loc.category || '',
+                    loc.address || '',
+                    loc.description
+                ].join(' ').toLowerCase();
+                return haystack.includes(lowerQuery);
+            });
+        }
+
+        function renderLocationResults(query) {
+            const results = query.trim() ? filterLocations(query) : [];
+            
+            // Filter out already selected locations
+            const selectedIds = new Set(selectedStops.map(s => s.id));
+            const availableResults = results.filter(loc => !selectedIds.has(loc.id));
+
+            locationResults.innerHTML = '';
+            
+            if (availableResults.length === 0 && query.trim()) {
+                locationResults.innerHTML = '<p class="no-results">No matching locations found.</p>';
+                return;
+            }
+
+            availableResults.forEach(location => {
+                const item = document.createElement('div');
+                item.className = 'location-result-item';
+                item.innerHTML = `
+                    <strong>${location.name}</strong>
+                    ${location.category ? `<span class="category">${location.category}</span>` : ''}
+                    <button type="button" class="add-location-btn" data-location-id="${location.id}">Add</button>
+                `;
+                
+                item.querySelector('.add-location-btn').addEventListener('click', () => {
+                    addLocation(location);
+                    searchInput.value = '';
+                    renderLocationResults('');
+                });
+                
+                locationResults.appendChild(item);
+            });
+        }
+
+        function addLocation(location) {
+            if (selectedStops.find(s => s.id === location.id)) {
+                return; // Already added
+            }
+            
+            selectedStops.push(location);
+            renderSelectedStops();
+            updateSaveButton();
+        }
+
+        function removeLocation(locationId) {
+            selectedStops = selectedStops.filter(s => s.id !== locationId);
+            renderSelectedStops();
+            updateSaveButton();
+        }
+
+        function moveStop(index, direction) {
+            if (direction === 'up' && index > 0) {
+                [selectedStops[index], selectedStops[index - 1]] = [selectedStops[index - 1], selectedStops[index]];
+            } else if (direction === 'down' && index < selectedStops.length - 1) {
+                [selectedStops[index], selectedStops[index + 1]] = [selectedStops[index + 1], selectedStops[index]];
+            }
+            renderSelectedStops();
+        }
+
+        function renderSelectedStops() {
+            selectedStopsList.innerHTML = '';
+            stopCountSpan.textContent = `(${selectedStops.length})`;
+            
+            if (selectedStops.length === 0) {
+                noStopsMessage.hidden = false;
+                return;
+            }
+            
+            noStopsMessage.hidden = true;
+
+            selectedStops.forEach((location, index) => {
+                const li = document.createElement('li');
+                li.className = 'stop-item';
+                li.draggable = true;
+                li.dataset.index = index;
+                li.innerHTML = `
+                    <span class="stop-number">${index + 1}</span>
+                    <div class="stop-info">
+                        <strong>${location.name}</strong>
+                        ${location.category ? `<span class="category">${location.category}</span>` : ''}
+                    </div>
+                    <div class="stop-actions">
+                        <button type="button" class="move-btn" data-direction="up" ${index === 0 ? 'disabled' : ''}>↑</button>
+                        <button type="button" class="move-btn" data-direction="down" ${index === selectedStops.length - 1 ? 'disabled' : ''}>↓</button>
+                        <button type="button" class="remove-btn">Remove</button>
+                    </div>
+                `;
+
+                li.querySelector('.remove-btn').addEventListener('click', () => removeLocation(location.id));
+                
+                const upBtn = li.querySelector('[data-direction="up"]');
+                const downBtn = li.querySelector('[data-direction="down"]');
+                upBtn.addEventListener('click', () => moveStop(index, 'up'));
+                downBtn.addEventListener('click', () => moveStop(index, 'down'));
+
+                // Drag and drop
+                li.addEventListener('dragstart', (e) => {
+                    draggedElement = li;
+                    e.dataTransfer.effectAllowed = 'move';
+                    li.style.opacity = '0.5';
+                });
+
+                li.addEventListener('dragend', () => {
+                    draggedElement = null;
+                    li.style.opacity = '1';
+                });
+
+                li.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (draggedElement && draggedElement !== li) {
+                        const indexFrom = parseInt(draggedElement.dataset.index);
+                        const indexTo = parseInt(li.dataset.index);
+                        if (indexFrom !== indexTo) {
+                            [selectedStops[indexFrom], selectedStops[indexTo]] = [selectedStops[indexTo], selectedStops[indexFrom]];
+                            renderSelectedStops();
+                        }
+                    }
+                });
+
+                li.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                });
+
+                selectedStopsList.appendChild(li);
+            });
+        }
+
+        function updateSaveButton() {
+            const hasName = document.getElementById('tour-name').value.trim() !== '';
+            const hasStops = selectedStops.length > 0;
+            saveBtn.disabled = !(hasName && hasStops);
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            renderLocationResults(e.target.value);
+        });
+
+        document.getElementById('tour-name').addEventListener('input', updateSaveButton);
+
+        tourForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('tour-name').value.trim();
+            const description = document.getElementById('tour-description').value.trim();
+            const locationIds = selectedStops.map(s => s.id);
+
+            if (!name || locationIds.length === 0) {
+                alert('Please provide a tour name and at least one stop.');
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            try {
+                const response = await fetch('{% url "campus:tour-list" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        location_ids: locationIds
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '{% url "campus:overview" %}';
+                } else {
+                    alert(data.error || 'Failed to create tour. Please try again.');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Tour';
+                }
+            } catch (error) {
+                console.error('Error creating tour:', error);
+                alert('An error occurred. Please try again.');
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Tour';
+            }
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            window.location.href = '{% url "campus:overview" %}';
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Initialize
+        renderLocationResults('');
+    })();
+</script>
+<style>
+.tour-create-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    min-height: calc(100vh - 100px);
+}
+
+.tour-create-header {
+    margin-bottom: 2rem;
+}
+
+.tour-create-header h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.75rem;
+    color: #003057;
+}
+
+.back-link {
+    color: #003057;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.tour-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.tour-stops-section {
+    margin-top: 2rem;
+}
+
+.tour-stops-section h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+    color: #003057;
+}
+
+.location-selector {
+    margin-bottom: 2rem;
+}
+
+.location-results {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+
+.location-result-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.location-result-item:last-child {
+    border-bottom: none;
+}
+
+.location-result-item strong {
+    flex: 1;
+}
+
+.category {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.add-location-btn {
+    padding: 0.25rem 0.75rem;
+    background: #003057;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.add-location-btn:hover {
+    background: #001f3f;
+}
+
+.selected-stops h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.help-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0 0 1rem 0;
+}
+
+.stops-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.stop-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    cursor: move;
+}
+
+.stop-item:hover {
+    background: #f3f4f6;
+}
+
+.stop-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: #003057;
+    color: white;
+    border-radius: 50%;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.stop-info {
+    flex: 1;
+}
+
+.stop-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.move-btn {
+    padding: 0.25rem 0.5rem;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.move-btn:hover:not(:disabled) {
+    background: #f3f4f6;
+}
+
+.move-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.remove-btn {
+    padding: 0.25rem 0.75rem;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.remove-btn:hover {
+    background: #b91c1c;
+}
+
+.empty-message {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.btn-primary {
+    background: #003057;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #001f3f;
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: white;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.btn-secondary:hover {
+    background: #f9fafb;
+}
+
+.no-results {
+    padding: 1rem;
+    text-align: center;
+    color: #6b7280;
+}
+</style>
+{% endblock %}
