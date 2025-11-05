@@ -70,7 +70,8 @@ def get_landmark_context(locations: Iterable) -> str:
                 f"  Category: {location.category or 'General'}\n"
                 f"  Coordinates: ({location.latitude}, {location.longitude})\n"
                 f"  Address: {location.address or 'N/A'}\n"
-                f"  Summary: {location.description.strip()}"
+                f"  Summary: {location.description.strip()}\n"
+                f"  Historical Info: {location.historical_info or ''}"
             )
         )
     return "\n".join(rows)
