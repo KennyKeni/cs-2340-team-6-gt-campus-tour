@@ -1,14 +1,36 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Temporary Home | GT Tour{% endblock %}
+{% block title %}Home | GT Tour{% endblock %}
 
 {% block content %}
-<section class="panel" style="max-width: 720px; margin: 2rem auto; padding: 2rem;">
-    <header class="panel-heading">Temporary Landing Page</header>
-    <div style="padding: 1.25rem; line-height: 1.6;">
-        <p style="margin-top: 0;"><strong>This is a temporary home page.</strong></p>
-        <p>We are actively building out the Georgia Tech campus explorer experience. In the meantime, use the navigation bar to jump straight to the interactive map and AI assistant.</p>
-        <p>Check back soon for curated tours, planning tools, and more visitor resources.</p>
+<section class="hero-section">
+    <div class="hero-image-container">
+        <img src="{% static 'tech_tower.JPG' %}" alt="Tech Tower at Georgia Tech" class="hero-image">
+        <div class="hero-overlay">
+            <h1 class="hero-title">Explore Georgia Tech</h1>
+            <p class="hero-subtitle">Discover the history, landmarks, and spirit of Georgia Tech's campus</p>
+            <a href="{% url 'campus:overview' %}" class="hero-cta">Start Exploring</a>
+        </div>
+    </div>
+    <div class="hero-content">
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🗺️</div>
+                <h3 class="feature-title">Interactive Map</h3>
+                <p class="feature-description">Navigate campus with our interactive map and discover landmarks</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎓</div>
+                <h3 class="feature-title">Custom Tours</h3>
+                <p class="feature-description">Create and save personalized campus tours</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3 class="feature-title">AI Assistant</h3>
+                <p class="feature-description">Get answers about campus locations and history</p>
+            </div>
+        </div>
     </div>
 </section>
 {% endblock %}

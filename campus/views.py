@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 from .ai import CampusAiError, ChatMessage, get_landmark_context, run_landmark_chat
 from .models import Location, Bookmark, Tour, TourStop
 from .forms import LocationForm
+from .route_utils import calculate_route_segments, RouteCalculationError
 
 
 # -------------------------------------------------------------------------
@@ -379,6 +380,7 @@ def tour_list(request):
                 'description': tour.description,
                 'created_at': tour.created_at.isoformat(),
                 'stops': stops,
+                'route_data': tour.route_data,
             })
         return JsonResponse({'tours': data})
     elif request.method == 'POST':
@@ -422,6 +424,24 @@ def tour_list(request):
                 order=order,
             )
 
+        # Calculate and save route segments
+        stops_data = []
+        for stop in tour.stops.all():
+            stops_data.append({
+                'id': stop.location.id,
+                'name': stop.location.name,
+                'latitude': float(stop.location.latitude),
+                'longitude': float(stop.location.longitude),
+            })
+
+        if len(stops_data) >= 2:
+            try:
+                route_segments = calculate_route_segments(stops_data)
+                tour.route_data = {'segments': route_segments} if route_segments else None
+                tour.save()
+            except RouteCalculationError as e:
+                pass
+
         # Return created tour with stops
         stops = []
         for stop in tour.stops.all():
@@ -447,6 +467,7 @@ def tour_list(request):
             'description': tour.description,
             'created_at': tour.created_at.isoformat(),
             'stops': stops,
+            'route_data': tour.route_data,
         }, status=201)
     else:
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
@@ -504,6 +525,24 @@ def tour_detail(request, tour_id):
                 order=order,
             )
 
+        # Recalculate and save route segments
+        stops_data = []
+        for stop in tour.stops.all():
+            stops_data.append({
+                'id': stop.location.id,
+                'name': stop.location.name,
+                'latitude': float(stop.location.latitude),
+                'longitude': float(stop.location.longitude),
+            })
+
+        if len(stops_data) >= 2:
+            try:
+                route_segments = calculate_route_segments(stops_data)
+                tour.route_data = {'segments': route_segments} if route_segments else None
+                tour.save()
+            except RouteCalculationError as e:
+                pass
+
         # Return updated tour with stops
         stops = []
         for stop in tour.stops.all():
@@ -529,6 +568,7 @@ def tour_detail(request, tour_id):
             'description': tour.description,
             'created_at': tour.created_at.isoformat(),
             'stops': stops,
+            'route_data': tour.route_data,
         })
     elif request.method == 'DELETE':
         """Delete a tour."""
