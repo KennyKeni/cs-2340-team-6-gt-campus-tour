@@ -723,6 +723,32 @@
         searchInput.addEventListener('input', applyFilter);
 
         toggleView();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const navigateSlug = urlParams.get('navigate');
+        if (navigateSlug) {
+            const targetCard = locationContainer.querySelector(`.location-card[data-slug="${navigateSlug}"]`);
+            if (targetCard) {
+                function waitForCurrentLocation(callback, maxAttempts = 20, attemptCount = 0) {
+                    if (window.currentLocationCoords) {
+                        callback();
+                    } else if (attemptCount < maxAttempts) {
+                        setTimeout(() => waitForCurrentLocation(callback, maxAttempts, attemptCount + 1), 250);
+                    } else {
+                        showLocationDetail(targetCard);
+                        alert('Current location not available. Please enable location services to get directions.');
+                    }
+                }
+
+                waitForCurrentLocation(() => {
+                    showLocationDetail(targetCard);
+                    const navigateButton = locationDetailContent.querySelector('.location-detail-navigate-btn');
+                    if (navigateButton) {
+                        navigateButton.click();
+                    }
+                });
+            }
+        }
     })();
 </script>
 <script>
