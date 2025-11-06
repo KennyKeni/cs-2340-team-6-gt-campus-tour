@@ -217,6 +217,7 @@ def location_list(request):
 
 
 @csrf_exempt
+@login_required
 @require_POST
 def chat_with_assistant(request):
     """Handles AI assistant chat messages about landmarks."""

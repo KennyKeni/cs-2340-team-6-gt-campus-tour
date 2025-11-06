@@ -122,6 +122,7 @@
     </section>
     <section class="panel chat-panel" aria-labelledby="chat-heading">
         <header id="chat-heading" class="panel-heading">Ask About Landmarks</header>
+        {% if user.is_authenticated %}
         <div id="chat-history" class="chat-history" aria-live="polite">
         </div>
         <form id="chat-form" class="chat-input" novalidate>
@@ -129,6 +130,11 @@
             <textarea id="chat-message" name="message" placeholder="Ask about a building or landmark..." required></textarea>
             <button type="submit" id="chat-submit">Send</button>
         </form>
+        {% else %}
+        <div class="chat-history">
+            <p class="sidebar-placeholder">Please <a href="{% url 'accounts:login' %}">login</a> to use the AI chat assistant.</p>
+        </div>
+        {% endif %}
     </section>
 </div>
 {% endblock %}
@@ -753,6 +759,11 @@
 </script>
 <script>
     (function () {
+        const userIsAuthenticated = {{ user.is_authenticated|yesno:"true,false" }};
+        if (!userIsAuthenticated) {
+            return;
+        }
+
         const storageKey = 'campusChatHistory';
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-message');
