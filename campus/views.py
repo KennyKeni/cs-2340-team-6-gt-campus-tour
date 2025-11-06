@@ -70,9 +70,42 @@ def campus_overview(request):
 
 
 @login_required
-def tour_create(request):
-    """Render the tour creation page."""
+def tour_create(request, tour_id=None):
+    """Render the tour creation/edit page."""
+    tour = None
+    tour_payload = None
+
+    if tour_id:
+        tour = get_object_or_404(Tour, id=tour_id, user=request.user)
+        stops = []
+        for stop in tour.stops.all():
+            stops.append({
+                'id': stop.id,
+                'location_id': stop.location.id,
+                'order': stop.order,
+                'location': {
+                    'id': stop.location.id,
+                    'name': stop.location.name,
+                    'slug': stop.location.slug,
+                    'description': stop.location.description,
+                    'latitude': float(stop.location.latitude),
+                    'longitude': float(stop.location.longitude),
+                    'address': stop.location.address,
+                    'category': stop.location.category,
+                }
+            })
+        tour_payload = {
+            'id': tour.id,
+            'name': tour.name,
+            'description': tour.description,
+            'stops': stops,
+        }
+
     locations = Location.objects.all()
+    bookmarked_slugs = set(
+        Bookmark.objects.filter(user=request.user).values_list('location__slug', flat=True)
+    )
+
     locations_payload = [
         {
             'id': location.id,
@@ -83,14 +116,78 @@ def tour_create(request):
             'longitude': float(location.longitude),
             'address': location.address,
             'category': location.category,
+            'is_bookmarked': location.slug in bookmarked_slugs,
         }
         for location in locations
     ]
     context = {
         'locations': locations,
         'locations_payload': locations_payload,
+        'tour': tour,
+        'tour_payload': tour_payload,
+        'is_edit': tour_id is not None,
     }
     return render(request, 'campus/tour_create.html', context)
+
+
+@login_required
+def tour_manage(request):
+    """Render the tour management page where users can view and edit their tours."""
+    tours = Tour.objects.filter(user=request.user).prefetch_related('stops__location')
+    locations = Location.objects.all()
+    bookmarked_slugs = set(
+        Bookmark.objects.filter(user=request.user).values_list('location__slug', flat=True)
+    )
+
+    tours_payload = []
+    for tour in tours:
+        stops = []
+        for stop in tour.stops.all():
+            stops.append({
+                'id': stop.id,
+                'location_id': stop.location.id,
+                'order': stop.order,
+                'location': {
+                    'id': stop.location.id,
+                    'name': stop.location.name,
+                    'slug': stop.location.slug,
+                    'description': stop.location.description,
+                    'latitude': float(stop.location.latitude),
+                    'longitude': float(stop.location.longitude),
+                    'address': stop.location.address,
+                    'category': stop.location.category,
+                }
+            })
+        tours_payload.append({
+            'id': tour.id,
+            'name': tour.name,
+            'description': tour.description,
+            'created_at': tour.created_at.isoformat(),
+            'stops': stops,
+        })
+
+    locations_payload = [
+        {
+            'id': location.id,
+            'name': location.name,
+            'slug': location.slug,
+            'description': location.description,
+            'latitude': float(location.latitude),
+            'longitude': float(location.longitude),
+            'address': location.address,
+            'category': location.category,
+            'is_bookmarked': location.slug in bookmarked_slugs,
+        }
+        for location in locations
+    ]
+
+    context = {
+        'tours': tours,
+        'tours_payload': tours_payload,
+        'locations': locations,
+        'locations_payload': locations_payload,
+    }
+    return render(request, 'campus/tour_manage.html', context)
 
 
 @require_GET

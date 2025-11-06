@@ -77,7 +77,6 @@
                         <div class="tour-card-header">
                             <h3 class="tour-title">{{ tour.name }}</h3>
                             <div class="tour-card-actions">
-                                <button type="button" class="tour-delete-btn" data-tour-id="{{ tour.id }}" aria-label="Delete tour" title="Delete tour">🗑️</button>
                                 <button type="button" class="tour-toggle" data-tour-id="{{ tour.id }}" aria-label="Toggle tour details">▼</button>
                             </div>
                         </div>
@@ -132,30 +131,19 @@
     function createInfoWindowContent(location) {
         const addressLine = location.address ? `<p><strong>Address:</strong> ${location.address}</p>` : '';
         const categoryLine = location.category ? `<p><strong>Category:</strong> ${location.category}</p>` : '';
-        
-        // Add photo if available
+
         const photoUrl = location.photo || location.image_url;
         console.log('Photo URL for', location.name, ':', photoUrl);
         const photoLine = photoUrl ? `
             <div style="margin-bottom: 0.75rem;">
-                <img src="${photoUrl}" 
-                     alt="${location.name}" 
+                <img src="${photoUrl}"
+                     alt="${location.name}"
                      style="width: 100%; max-width: 300px; height: auto; border-radius: 8px; display: block; object-fit: cover;"
                      onerror="console.error('Failed to load image:', this.src); this.style.display='none';"
                      onload="console.log('Image loaded successfully:', this.src)">
             </div>
         ` : '';
-        
-        // Add historical info if available
-        const historicalLine = location.historical_info ? `
-            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
-                <p style="margin: 0; font-size: 0.9rem; color: #6b7280;">
-                    <strong>Historical Info:</strong><br>
-                    ${location.historical_info}
-                </p>
-            </div>
-        ` : '';
-        
+
         return `
             <div style="max-width: 320px;">
                 ${photoLine}
@@ -163,7 +151,6 @@
                 ${categoryLine}
                 ${addressLine}
                 <p style="margin: 0.5rem 0;">${location.description}</p>
-                ${historicalLine}
             </div>
         `;
     }
@@ -222,10 +209,21 @@
             marker.addListener('click', () => {
                 infoWindow.setContent(createInfoWindowContent(location));
                 infoWindow.open(map, marker);
+
+                const locationCard = document.querySelector(`.location-card[data-slug="${location.slug}"]`);
+                if (locationCard) {
+                    const viewSelect = document.getElementById('sidebar-view');
+                    if (viewSelect && viewSelect.value !== 'locations') {
+                        viewSelect.value = 'locations';
+                        viewSelect.dispatchEvent(new Event('change'));
+                    }
+
+                    locationCard.click();
+                    locationCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
             });
         });
 
-        // Add current location marker
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -758,8 +756,7 @@
             }
         }
 
-        const initialHistory = loadHistory();
-        renderHistory(initialHistory);
+        localStorage.removeItem(storageKey);
 
         chatForm.addEventListener('submit', sendMessage);
     })();
@@ -781,77 +778,6 @@
                     }
                     e.preventDefault();
                     e.stopPropagation();
-                }
-            }
-        });
-
-        // Tour delete button handler
-        document.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('tour-delete-btn') || e.target.closest('.tour-delete-btn')) {
-                const btn = e.target.classList.contains('tour-delete-btn') ? e.target : e.target.closest('.tour-delete-btn');
-                const tourId = btn.dataset.tourId;
-                if (tourId) {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    // Confirm deletion
-                    const tourCard = btn.closest('.tour-card');
-                    const tourName = tourCard.querySelector('.tour-title')?.textContent || 'this tour';
-                    
-                    if (!confirm(`Are you sure you want to delete "${tourName}"? This action cannot be undone.`)) {
-                        return;
-                    }
-
-                    // Disable button during deletion
-                    btn.disabled = true;
-                    btn.textContent = '...';
-
-                    try {
-                        // Get CSRF token
-                        const getCsrfToken = () => {
-                            const token = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-                            if (token) return token;
-                            const cookies = document.cookie.split(';');
-                            for (let cookie of cookies) {
-                                const [name, value] = cookie.trim().split('=');
-                                if (name === 'csrftoken') return decodeURIComponent(value);
-                            }
-                            return '';
-                        };
-
-                        const response = await fetch(`/campus/api/tours/${tourId}/`, {
-                            method: 'DELETE',
-                            headers: {
-                                'X-CSRFToken': getCsrfToken()
-                            }
-                        });
-
-                        if (response.ok) {
-                            // Clear route if this tour was displayed
-                            if (currentTourRoute === parseInt(tourId)) {
-                                clearTourRoute();
-                            }
-                            
-                            // Remove tour card from DOM
-                            tourCard.remove();
-
-                            // Check if no tours left
-                            const tourList = document.getElementById('tour-items');
-                            if (tourList && tourList.children.length === 0) {
-                                tourList.innerHTML = '<p class="sidebar-empty">No tours yet. <a href="{% url "campus:tour-create" %}">Create your first tour</a>!</p>';
-                            }
-                        } else {
-                            const data = await response.json();
-                            alert(data.error || 'Failed to delete tour. Please try again.');
-                            btn.disabled = false;
-                            btn.textContent = '🗑️';
-                        }
-                    } catch (error) {
-                        console.error('Error deleting tour:', error);
-                        alert('An error occurred while deleting the tour. Please try again.');
-                        btn.disabled = false;
-                        btn.textContent = '🗑️';
-                    }
                 }
             }
         });

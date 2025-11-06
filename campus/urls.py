@@ -6,7 +6,6 @@ app_name = 'campus'
 urlpatterns = [
     # Existing endpoints
     path('', views.campus_overview, name='overview'),
-    path('tours/create/', views.tour_create, name='tour-create'),
     path('api/locations/', views.location_list, name='location-list'),
     path('api/chat/', views.chat_with_assistant, name='chat'),
 
@@ -31,6 +30,9 @@ urlpatterns = [
     # ---------------------------------------------------------------------
     # Tour endpoints (User Story #7)
     # ---------------------------------------------------------------------
+    path('tours/', views.tour_manage, name='tour-manage'),
+    path('tours/create/', views.tour_create, name='tour-create'),
+    path('tours/<int:tour_id>/edit/', views.tour_create, name='tour-edit'),
     path('api/tours/', views.tour_list, name='tour-list'),
     path('api/tours/<int:tour_id>/', views.tour_detail, name='tour-detail'),
 ]
