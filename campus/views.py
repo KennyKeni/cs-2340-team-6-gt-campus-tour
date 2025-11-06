@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .ai import CampusAiError, ChatMessage, get_landmark_context, run_landmark_chat
-from .models import Location, Bookmark, Tour, TourStop
+from .models import Location, Bookmark, Tour, TourStop, TourBookmark
 from .forms import LocationForm
 from .route_utils import calculate_route_segments, RouteCalculationError
 
@@ -53,17 +53,22 @@ def campus_overview(request):
     
     # Get user's tours if authenticated
     tours = []
+    bookmarked_tour_ids = set()
     if request.user.is_authenticated:
         tours = Tour.objects.filter(user=request.user).prefetch_related('stops__location')
-    
+        bookmarked_tour_ids = set(
+            TourBookmark.objects.filter(user=request.user).values_list('tour__id', flat=True)
+        )
+
     # Get API key from settings
     api_key = settings.GOOGLE_MAP_API_KEY
-    
+
     context = {
         'locations': locations_list,
         'locations_payload': locations_payload,
         'bookmarked_slugs': list(bookmarked_slugs),
         'tours': tours,
+        'bookmarked_tour_ids': bookmarked_tour_ids,
         'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
         'map_center': {'lat': 33.7780, 'lng': -84.3980},
     }
@@ -139,6 +144,9 @@ def tour_manage(request):
     bookmarked_slugs = set(
         Bookmark.objects.filter(user=request.user).values_list('location__slug', flat=True)
     )
+    bookmarked_tour_ids = set(
+        TourBookmark.objects.filter(user=request.user).values_list('tour__id', flat=True)
+    )
 
     tours_payload = []
     for tour in tours:
@@ -165,6 +173,7 @@ def tour_manage(request):
             'description': tour.description,
             'created_at': tour.created_at.isoformat(),
             'stops': stops,
+            'is_bookmarked': tour.id in bookmarked_tour_ids,
         })
 
     locations_payload = [
@@ -187,6 +196,7 @@ def tour_manage(request):
         'tours_payload': tours_payload,
         'locations': locations,
         'locations_payload': locations_payload,
+        'bookmarked_tour_ids': bookmarked_tour_ids,
     }
     return render(request, 'campus/tour_manage.html', context)
 
@@ -344,6 +354,25 @@ def toggle_bookmark(request, slug):
     else:
         # Add bookmark
         Bookmark.objects.create(user=request.user, location=location)
+        return JsonResponse({'bookmarked': True, 'message': 'Bookmark added'})
+
+
+@login_required
+@require_POST
+def toggle_tour_bookmark(request, tour_id):
+    """Toggle bookmark status for a tour."""
+    tour = get_object_or_404(Tour, id=tour_id)
+
+    # Check if bookmark already exists
+    bookmark = TourBookmark.objects.filter(user=request.user, tour=tour).first()
+
+    if bookmark:
+        # Remove bookmark
+        bookmark.delete()
+        return JsonResponse({'bookmarked': False, 'message': 'Bookmark removed'})
+    else:
+        # Add bookmark
+        TourBookmark.objects.create(user=request.user, tour=tour)
         return JsonResponse({'bookmarked': True, 'message': 'Bookmark added'})
 
 
@@ -563,6 +592,8 @@ def tour_detail(request, tour_id):
                 }
             })
 
+        is_bookmarked = TourBookmark.objects.filter(user=request.user, tour=tour).exists()
+
         return JsonResponse({
             'id': tour.id,
             'name': tour.name,
@@ -570,6 +601,7 @@ def tour_detail(request, tour_id):
             'created_at': tour.created_at.isoformat(),
             'stops': stops,
             'route_data': tour.route_data,
+            'is_bookmarked': is_bookmarked,
         })
     elif request.method == 'DELETE':
         """Delete a tour."""

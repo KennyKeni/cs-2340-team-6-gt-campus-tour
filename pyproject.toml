@@ -9,4 +9,5 @@ dependencies = [
     "pillow>=11.0.0",
     "pydantic-ai-slim[openai]>=1.9.1",
     "python-dotenv>=1.2.1",
+    "requests>=2.32.0",
 ]

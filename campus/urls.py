@@ -18,6 +18,7 @@ urlpatterns = [
     # Bookmark endpoints (User Story #8)
     # ---------------------------------------------------------------------
     path('api/locations/<slug:slug>/bookmark/', views.toggle_bookmark, name='toggle-bookmark'),
+    path('api/tours/<int:tour_id>/bookmark/', views.toggle_tour_bookmark, name='toggle-tour-bookmark'),
 
     # ---------------------------------------------------------------------
     # New admin CRUD endpoints (User Story #12 – Shashwat)

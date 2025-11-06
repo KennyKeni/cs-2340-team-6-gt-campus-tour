@@ -107,6 +107,37 @@ class Bookmark(models.Model):
         return f"{self.user.username} → {self.location.name}"
 
 
+class TourBookmark(models.Model):
+    """
+    Represents a user's bookmarked tour.
+    Allows visitors to save tours for quick access.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='tour_bookmarks',
+        help_text="The user who bookmarked this tour.",
+    )
+    tour = models.ForeignKey(
+        'Tour',
+        on_delete=models.CASCADE,
+        related_name='bookmarks',
+        help_text="The tour that was bookmarked.",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this bookmark was created.",
+    )
+
+    class Meta:
+        unique_together = ['user', 'tour']
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.user.username} → {self.tour.name}"
+
+
 class Tour(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)

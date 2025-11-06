@@ -674,6 +674,70 @@ main {
     gap: 0.25rem;
 }
 
+.sidebar-tour-bookmark {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.sidebar-tour-bookmark:hover {
+    color: #fbbf24;
+    transform: scale(1.1);
+}
+
+.sidebar-tour-bookmark .bookmark-icon {
+    transition: all 0.2s ease-in-out;
+}
+
+.sidebar-tour-bookmark .bookmark-icon.bookmarked {
+    fill: #fbbf24;
+    color: #fbbf24;
+}
+
+.tour-detail-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+.tour-detail-bookmark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background-color: #003057;
+    color: #fff;
+    transition: all 0.2s ease-in-out;
+}
+
+.tour-detail-bookmark:hover {
+    background-color: #00467f;
+    transform: translateY(-1px);
+}
+
+.tour-detail-bookmark .bookmark-icon {
+    width: 20px;
+    height: 20px;
+    transition: all 0.2s ease-in-out;
+}
+
+.tour-detail-bookmark .bookmark-icon.bookmarked {
+    fill: currentColor;
+}
+
 .tour-card-indicator {
     font-size: 1.5rem;
     line-height: 1;
