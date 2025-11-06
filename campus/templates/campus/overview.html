@@ -1273,15 +1273,7 @@
             const isBookmarked = tour.is_bookmarked || false;
             parts.push(`<article class="location-detail-card" data-tour-id="${tour.id}">`);
             parts.push('<header class="location-detail-header">');
-            parts.push('<div class="tour-detail-title-row">');
             parts.push(`<h3 class="location-detail-title">${escapeHtml(tour.name || 'Untitled tour')}</h3>`);
-            parts.push(`<button class="tour-bookmark-btn tour-detail-bookmark" data-tour-id="${tour.id}" data-bookmarked="${isBookmarked}" title="${isBookmarked ? 'Remove bookmark' : 'Add bookmark'}">`);
-            parts.push(`<svg class="bookmark-icon ${isBookmarked ? 'bookmarked' : ''}" width="24" height="24" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">`);
-            parts.push('<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>');
-            parts.push('</svg>');
-            parts.push(`<span class="bookmark-label">${isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>`);
-            parts.push('</button>');
-            parts.push('</div>');
             parts.push('<span class="location-detail-category">Custom Tour</span>');
             parts.push('</header>');
             parts.push(`<p class="tour-detail-meta">${stopCount} stop${stopCount === 1 ? '' : 's'}</p>`);
@@ -1321,11 +1313,16 @@
 
             parts.push('</div>');
 
-            parts.push('<div class="location-detail-actions tour-detail-actions">');
+            parts.push('<div class="location-detail-actions">');
+            parts.push('<div class="location-detail-action-row">');
+            parts.push(`<button type="button" class="bookmark-btn tour-detail-bookmark" data-tour-id="${tour.id}" data-bookmarked="${isBookmarked}" aria-label="${isBookmarked ? 'Remove bookmark for ' : 'Bookmark '}${escapeHtml(tour.name || 'this tour')}" title="${isBookmarked ? 'Remove bookmark' : 'Add bookmark'}">`);
+            parts.push(`<svg class="bookmark-icon${isBookmarked ? ' bookmarked' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`);
+            parts.push(`<span class="bookmark-label">${isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>`);
+            parts.push('</button>');
             if (editUrl) {
-                parts.push(`<a class="tour-edit-btn" href="${escapeHtml(editUrl)}">Edit this tour</a>`);
+                parts.push(`<a class="location-detail-navigate-btn tour-edit-btn" href="${escapeHtml(editUrl)}">Edit this tour</a>`);
             }
-            parts.push('<span class="tour-detail-tip">Use the tour builder to rearrange, add, or remove stops.</span>');
+            parts.push('</div>');
             parts.push('</div>');
             parts.push('</article>');
 

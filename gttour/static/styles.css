@@ -700,44 +700,6 @@ main {
     color: #fbbf24;
 }
 
-.tour-detail-title-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    width: 100%;
-}
-
-.tour-detail-bookmark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    background-color: #003057;
-    color: #fff;
-    transition: all 0.2s ease-in-out;
-}
-
-.tour-detail-bookmark:hover {
-    background-color: #00467f;
-    transform: translateY(-1px);
-}
-
-.tour-detail-bookmark .bookmark-icon {
-    width: 20px;
-    height: 20px;
-    transition: all 0.2s ease-in-out;
-}
-
-.tour-detail-bookmark .bookmark-icon.bookmarked {
-    fill: currentColor;
-}
-
 .tour-card-indicator {
     font-size: 1.5rem;
     line-height: 1;
@@ -932,32 +894,6 @@ main {
     align-items: flex-start;
     gap: 0.4rem;
     width: 100%;
-}
-
-.tour-edit-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.65rem 1.2rem;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #facc15, #f59e0b);
-    color: #003057;
-    font-weight: 700;
-    font-size: 0.95rem;
-    text-decoration: none;
-    box-shadow: 0 12px 20px rgba(217, 119, 6, 0.28);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
-    width: 100%;
-}
-
-.tour-edit-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 18px 26px rgba(217, 119, 6, 0.35);
-}
-
-.tour-edit-btn:focus-visible {
-    outline: 3px solid rgba(2, 32, 71, 0.4);
-    outline-offset: 2px;
 }
 
 .tour-detail-tip {
