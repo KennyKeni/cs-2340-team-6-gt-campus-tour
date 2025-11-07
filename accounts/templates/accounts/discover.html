@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Discover Users - GT Tour{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'accounts/discover.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="discover-page">
+    <div class="discover-container">
+        <div class="discover-header">
+            <h2>Discover GT Explorers</h2>
+            <p class="discover-subtitle">Connect with other members of the GT campus community</p>
+        </div>
+
+        <div class="discover-search">
+            <form method="get" class="search-form">
+                <input
+                    type="text"
+                    name="search"
+                    placeholder="Search by name, username, or affiliation..."
+                    value="{{ search_query }}"
+                    class="search-input"
+                >
+                <button type="submit" class="search-button">Search</button>
+            </form>
+            {% if search_query %}
+                <p class="search-result-text">Found {{ total_count }} user{{ total_count|pluralize }}</p>
+            {% else %}
+                <p class="search-result-text">Showing {{ total_count }} public profile{{ total_count|pluralize }}</p>
+            {% endif %}
+        </div>
+
+        {% if user_data %}
+            <div class="users-grid">
+                {% for data in user_data %}
+                    <article class="user-card">
+                        <a href="{% url 'accounts:user_profile' data.user.username %}" class="user-card-link">
+                            <div class="user-card-avatar">{{ data.initial }}</div>
+                            <div class="user-card-info">
+                                <h3 class="user-card-name">{{ data.display_name }}</h3>
+                                <p class="user-card-username">@{{ data.user.username }}</p>
+                                {% if data.profile.affiliation %}
+                                    <p class="user-card-affiliation">{{ data.profile.affiliation }}</p>
+                                {% endif %}
+                                <div class="user-card-stats">
+                                    <span class="user-stat">
+                                        <strong>{{ data.location_count }}</strong> bookmark{{ data.location_count|pluralize }}
+                                    </span>
+                                    <span class="user-stat">
+                                        <strong>{{ data.tour_count }}</strong> tour{{ data.tour_count|pluralize }}
+                                    </span>
+                                </div>
+                            </div>
+                        </a>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                {% if search_query %}
+                    <p>No users found matching "{{ search_query }}"</p>
+                    <a href="{% url 'accounts:discover' %}" class="btn-secondary">Clear search</a>
+                {% else %}
+                    <p>No public profiles available yet.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

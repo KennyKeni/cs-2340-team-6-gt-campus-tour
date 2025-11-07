@@ -98,6 +98,7 @@
                                         {% endif %}
                                     </p>
                                 </div>
+                                <a href="{% url 'campus:overview' %}?tour={{ bookmark.tour.id }}" class="profile-pill-link">View</a>
                             </li>
                         {% endfor %}
                     </ul>

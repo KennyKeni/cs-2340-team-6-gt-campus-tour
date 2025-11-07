@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ display_name }} - GT Tour{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'accounts/profile.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="profile-page">
+    <div class="profile-container">
+        <div class="profile-header-stats-container">
+            <div class="profile-header panel">
+                <div class="profile-avatar">{{ user_initial }}</div>
+                <div class="profile-header-text">
+                    <p class="profile-welcome">{{ display_name }}</p>
+                    {% if affiliation %}
+                        <p class="profile-affiliation">{{ affiliation }}</p>
+                    {% endif %}
+                    <p class="profile-meta">@{{ profile_user.username }}</p>
+                    <p class="profile-meta">Member since {{ profile_user.date_joined|date:"F Y" }}</p>
+                </div>
+            </div>
+
+            <div class="profile-summary-grid">
+                <article class="profile-stat-card">
+                    <p class="profile-stat-label">Bookmarked Locations</p>
+                    <p class="profile-stat-value">{{ location_count }}</p>
+                    <p class="profile-stat-subtext">Saved places</p>
+                </article>
+                <article class="profile-stat-card">
+                    <p class="profile-stat-label">Tours Created</p>
+                    <p class="profile-stat-value">{{ tour_count }}</p>
+                    <p class="profile-stat-subtext">Shared experiences</p>
+                </article>
+            </div>
+        </div>
+
+        <section class="profile-panel panel">
+            <div class="profile-section-header">
+                <div>
+                    <h3>Created Tours</h3>
+                    <p class="profile-section-subtext">Tours shared by {{ display_name }}</p>
+                </div>
+            </div>
+            {% if created_tours %}
+                <ul class="profile-list">
+                    {% for tour in created_tours %}
+                        <li class="profile-list-item">
+                            <div>
+                                <p class="profile-item-title">{{ tour.name }}</p>
+                                <p class="profile-item-meta">
+                                    {{ tour.stop_total }} stop{{ tour.stop_total|pluralize }}
+                                    · Created {{ tour.created_at|date:"M j, Y" }}
+                                </p>
+                                {% if tour.description %}
+                                    <p class="profile-item-description">{{ tour.description|truncatechars:120 }}</p>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="profile-empty-state">
+                    <p>No tours created yet.</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}

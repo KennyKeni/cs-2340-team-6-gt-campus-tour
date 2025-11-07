@@ -747,6 +747,27 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const navigateSlug = urlParams.get('navigate');
+        const tourId = urlParams.get('tour');
+
+        // Handle tour URL parameter
+        if (tourId) {
+            // Switch to tours view in the sidebar
+            const viewSelect = document.getElementById('sidebar-view');
+            if (viewSelect) {
+                viewSelect.value = 'tours';
+                // Trigger the change event to update the UI
+                viewSelect.dispatchEvent(new Event('change'));
+            }
+
+            // Wait a bit for the tours to load, then show the tour
+            setTimeout(() => {
+                const tourCard = document.querySelector(`.tour-card[data-tour-id="${tourId}"]`);
+                if (tourCard) {
+                    tourCard.click();
+                }
+            }, 300);
+        }
+
         if (navigateSlug) {
             const targetCard = locationContainer.querySelector(`.location-card[data-slug="${navigateSlug}"]`);
             if (targetCard) {
@@ -919,6 +940,7 @@
         const tourDetailBack = document.getElementById('tour-detail-back');
         const tourContainer = document.getElementById('tour-items');
         const tourCreateBtn = document.getElementById('tour-create-btn');
+        const tourListHeader = tourCreateBtn ? tourCreateBtn.closest('.tour-list-header') : null;
         const csrfToken = "{{ csrf_token }}";
 
         const noop = () => {};
@@ -1242,11 +1264,19 @@
                 tourListView.style.display = '';
             }
 
+            if (tourListHeader) {
+                tourListHeader.style.display = '';
+            }
+
             if (tourDetailView) {
                 tourDetailView.hidden = true;
                 tourDetailView.setAttribute('aria-hidden', 'true');
                 tourDetailView.dataset.activeTourId = '';
                 tourDetailView.style.display = 'none';
+            }
+
+            if (tourSection) {
+                tourSection.classList.remove('detail-view-active');
             }
 
             if (tourDetailContent) {
@@ -1466,6 +1496,14 @@
                 tourListView.hidden = true;
                 tourListView.setAttribute('aria-hidden', 'true');
                 tourListView.style.display = 'none';
+            }
+
+            if (tourListHeader) {
+                tourListHeader.style.display = 'none';
+            }
+
+            if (tourSection) {
+                tourSection.classList.add('detail-view-active');
             }
 
             tourDetailView.hidden = false;

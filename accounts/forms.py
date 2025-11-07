@@ -55,3 +55,8 @@ class ProfileEditForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         help_text="e.g., Student, Faculty, Staff, Alumni, Visitor"
     )
+    is_private = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+        help_text="When enabled, your profile will be hidden from other users"
+    )
