@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Profile - GT Tour{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'accounts/profile.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="profile-page">
+    <div class="profile-container">
+        <div class="profile-header-stats-container">
+            <div class="profile-header panel">
+                <div class="profile-avatar">{{ user_initial }}</div>
+                <div class="profile-header-text">
+                    <p class="profile-welcome">Hi {{ display_name }}</p>
+                    {% if affiliation %}
+                        <p class="profile-affiliation">{{ affiliation }}</p>
+                    {% endif %}
+                    <p class="profile-meta">
+                        Member since {{ user.date_joined|date:"F Y" }} · {{ user.username }}
+                    </p>
+                </div>
+                <a href="{% url 'accounts:edit_profile' %}" class="profile-edit-btn">Edit Profile</a>
+            </div>
+
+            <div class="profile-summary-grid">
+            <article class="profile-stat-card">
+                <p class="profile-stat-label">Bookmarked Locations</p>
+                <p class="profile-stat-value">{{ location_count }}</p>
+                <p class="profile-stat-subtext">Saved places to revisit</p>
+            </article>
+            <article class="profile-stat-card">
+                <p class="profile-stat-label">Bookmarked Tours</p>
+                <p class="profile-stat-value">{{ tour_bookmark_count }}</p>
+                <p class="profile-stat-subtext">Inspiration for your next walk</p>
+            </article>
+            <article class="profile-stat-card">
+                <p class="profile-stat-label">Tours Created</p>
+                <p class="profile-stat-value">{{ created_tour_count }}</p>
+                <p class="profile-stat-subtext">Experiences you designed</p>
+            </article>
+        </div>
+        </div>
+
+        <div class="profile-panels-grid">
+            <section class="profile-panel panel">
+                <div class="profile-section-header">
+                    <div>
+                        <h3>Bookmarked Locations</h3>
+                        <p class="profile-section-subtext">Locations you pinned while exploring campus.</p>
+                    </div>
+                    <a href="{% url 'campus:overview' %}" class="profile-link">Open map</a>
+                </div>
+                {% if location_bookmarks %}
+                    <ul class="profile-list">
+                        {% for bookmark in location_bookmarks %}
+                            <li class="profile-list-item">
+                                <div>
+                                    <p class="profile-item-title">{{ bookmark.location.name }}</p>
+                                    <p class="profile-item-meta">
+                                        {{ bookmark.location.category|default:"Campus Location" }} ·
+                                        Saved {{ bookmark.created_at|date:"M j, Y" }}
+                                    </p>
+                                </div>
+                                <a href="{% url 'campus:location-detail' bookmark.location.slug %}" class="profile-pill-link">View</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="profile-empty-state">
+                        <p>You haven't bookmarked any locations yet.</p>
+                        <a href="{% url 'campus:overview' %}" class="profile-empty-cta">Browse locations</a>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="profile-panel panel">
+                <div class="profile-section-header">
+                    <div>
+                        <h3>Bookmarked Tours</h3>
+                        <p class="profile-section-subtext">Tours that caught your eye.</p>
+                    </div>
+                    <a href="{% url 'campus:tour-manage' %}" class="profile-link">Manage tours</a>
+                </div>
+                {% if tour_bookmarks %}
+                    <ul class="profile-list">
+                        {% for bookmark in tour_bookmarks %}
+                            <li class="profile-list-item">
+                                <div>
+                                    <p class="profile-item-title">{{ bookmark.tour.name }}</p>
+                                    <p class="profile-item-meta">
+                                        Saved {{ bookmark.created_at|date:"M j, Y" }}
+                                        {% if bookmark.tour.description %}
+                                            · {{ bookmark.tour.description|truncatechars:80 }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="profile-empty-state">
+                        <p>No bookmarked tours yet.</p>
+                        <a href="{% url 'campus:tour-manage' %}" class="profile-empty-cta">Find a tour</a>
+                    </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="profile-panel panel">
+            <div class="profile-section-header">
+                <div>
+                    <h3>Your Tours</h3>
+                    <p class="profile-section-subtext">Tours you've published for others.</p>
+                </div>
+                <a href="{% url 'campus:tour-create' %}" class="profile-link">Create tour</a>
+            </div>
+            {% if created_tours %}
+                <ul class="profile-list">
+                    {% for tour in created_tours %}
+                        <li class="profile-list-item">
+                            <div>
+                                <p class="profile-item-title">{{ tour.name }}</p>
+                                <p class="profile-item-meta">
+                                    {{ tour.stop_total }} stop{{ tour.stop_total|pluralize }}
+                                    · Created {{ tour.created_at|date:"M j, Y" }}
+                                </p>
+                                {% with stops=tour.stops.all %}
+                                    {% if stops %}
+                                        <p class="profile-item-description">
+                                            Route highlights:
+                                            {% for stop in stops|slice:":3" %}
+                                                {{ stop.location.name }}{% if not forloop.last %}, {% endif %}
+                                            {% endfor %}
+                                            {% if stops|length > 3 %}…{% endif %}
+                                        </p>
+                                    {% endif %}
+                                {% endwith %}
+                                {% if tour.description %}
+                                    <p class="profile-item-description">{{ tour.description|truncatechars:120 }}</p>
+                                {% endif %}
+                            </div>
+                            <a href="{% url 'campus:tour-edit' tour.id %}" class="profile-pill-link">Edit</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="profile-empty-state">
+                    <p>You haven't created a tour yet.</p>
+                    <a href="{% url 'campus:tour-create' %}" class="profile-empty-cta">Start building</a>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}

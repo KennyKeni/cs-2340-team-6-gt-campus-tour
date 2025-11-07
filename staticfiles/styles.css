@@ -1206,6 +1206,27 @@ main {
     transform: translateY(1px);
 }
 
+.btn-secondary {
+    display: inline-block;
+    padding: 0.85rem 1.5rem;
+    background-color: #f8fafc;
+    color: #003057;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    text-align: center;
+    margin-left: 0.5rem;
+}
+
+.btn-secondary:hover {
+    background-color: #e2e8f0;
+    border-color: #94a3b8;
+}
+
 .auth-switch {
     margin-top: 1.5rem;
     text-align: center;
@@ -1384,4 +1405,5 @@ main {
         grid-template-columns: 1fr;
         gap: 1.5rem;
     }
+
 }
