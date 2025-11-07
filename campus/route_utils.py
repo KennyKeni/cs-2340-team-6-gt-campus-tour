@@ -1,6 +1,9 @@
+import logging
 import requests
 from typing import List, Dict, Any, Optional
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 class RouteCalculationError(Exception):
@@ -9,12 +12,15 @@ class RouteCalculationError(Exception):
 
 def calculate_route_segments(stops: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
     if not stops or len(stops) < 2:
+        logger.warning("calculate_route_segments called with less than 2 stops")
         return None
 
     api_key = settings.GOOGLE_MAP_API_KEY
     if not api_key:
+        logger.error("Google Maps API key not configured in settings")
         raise RouteCalculationError("Google Maps API key not configured")
 
+    logger.info(f"Calculating route segments for {len(stops)} stops")
     segments = []
 
     for i in range(len(stops) - 1):
@@ -33,14 +39,20 @@ def calculate_route_segments(stops: List[Dict[str, Any]]) -> Optional[List[Dict[
         }
 
         try:
+            logger.debug(f"Requesting route from {origin_coords} to {destination_coords}")
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
 
             if data.get('status') != 'OK':
-                raise RouteCalculationError(f"Directions API error: {data.get('status')}")
+                error_msg = f"Directions API error: {data.get('status')}"
+                if data.get('error_message'):
+                    error_msg += f" - {data.get('error_message')}"
+                logger.error(error_msg)
+                raise RouteCalculationError(error_msg)
 
             if not data.get('routes'):
+                logger.error("No routes returned from Directions API")
                 raise RouteCalculationError("No routes returned from Directions API")
 
             route = data['routes'][0]
@@ -75,8 +87,12 @@ def calculate_route_segments(stops: List[Dict[str, Any]]) -> Optional[List[Dict[
             }
 
             segments.append(segment)
+            logger.debug(f"Successfully calculated segment {i+1} of {len(stops)-1}")
 
         except requests.RequestException as e:
-            raise RouteCalculationError(f"Failed to fetch directions: {str(e)}")
+            error_msg = f"Failed to fetch directions: {str(e)}"
+            logger.error(error_msg)
+            raise RouteCalculationError(error_msg)
 
+    logger.info(f"Successfully calculated {len(segments)} route segments")
     return segments

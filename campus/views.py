@@ -1,4 +1,5 @@
 import json
+import logging
 from json import JSONDecodeError
 from typing import List
 
@@ -13,6 +14,8 @@ from .ai import CampusAiError, ChatMessage, get_landmark_context, run_landmark_c
 from .models import Location, Bookmark, Tour, TourStop, TourBookmark
 from .forms import LocationForm
 from .route_utils import calculate_route_segments, RouteCalculationError
+
+logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------------------------
@@ -469,8 +472,11 @@ def tour_list(request):
                 route_segments = calculate_route_segments(stops_data)
                 tour.route_data = {'segments': route_segments} if route_segments else None
                 tour.save()
+                logger.info(f"Successfully calculated route for tour {tour.id} ({tour.name}) with {len(route_segments) if route_segments else 0} segments")
             except RouteCalculationError as e:
-                pass
+                logger.error(f"Failed to calculate route for tour {tour.id} ({tour.name}): {str(e)}")
+            except Exception as e:
+                logger.error(f"Unexpected error calculating route for tour {tour.id} ({tour.name}): {str(e)}")
 
         # Return created tour with stops
         stops = []
@@ -570,8 +576,11 @@ def tour_detail(request, tour_id):
                 route_segments = calculate_route_segments(stops_data)
                 tour.route_data = {'segments': route_segments} if route_segments else None
                 tour.save()
+                logger.info(f"Successfully calculated route for tour {tour.id} ({tour.name}) with {len(route_segments) if route_segments else 0} segments")
             except RouteCalculationError as e:
-                pass
+                logger.error(f"Failed to calculate route for tour {tour.id} ({tour.name}): {str(e)}")
+            except Exception as e:
+                logger.error(f"Unexpected error calculating route for tour {tour.id} ({tour.name}): {str(e)}")
 
         # Return updated tour with stops
         stops = []
