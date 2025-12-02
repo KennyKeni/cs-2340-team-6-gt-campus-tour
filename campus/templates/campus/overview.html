@@ -1005,6 +1005,9 @@
         const formatText = (value = '') => escapeHtml(value).replace(/\n/g, '<br>');
 
         function setNavControlsVisibility(show) {
+            if (show) {
+                ensureNavControls();
+            }
             if (navControls) {
                 navControls.style.display = show ? 'flex' : 'none';
             }
@@ -1381,13 +1384,26 @@
             const editUrl = currentTourCard?.dataset.tourEditUrl || '';
             const parts = [];
 
+            const segments = tour.route_data?.segments || [];
+            let totalDurationText = '';
+            if (segments.length > 0) {
+                let totalMinutes = 0;
+                segments.forEach(seg => {
+                    const match = seg.duration?.match(/(\d+)/);
+                    if (match) totalMinutes += parseInt(match[1], 10);
+                });
+                if (totalMinutes > 0) {
+                    totalDurationText = ` | Est. ${totalMinutes} min walk`;
+                }
+            }
+
             const isBookmarked = tour.is_bookmarked || false;
             parts.push(`<article class="location-detail-card" data-tour-id="${tour.id}">`);
             parts.push('<header class="location-detail-header">');
             parts.push(`<h3 class="location-detail-title">${escapeHtml(tour.name || 'Untitled tour')}</h3>`);
             parts.push('<span class="location-detail-category">Custom Tour</span>');
             parts.push('</header>');
-            parts.push(`<p class="tour-detail-meta">${stopCount} stop${stopCount === 1 ? '' : 's'}</p>`);
+            parts.push(`<p class="tour-detail-meta">${stopCount} stop${stopCount === 1 ? '' : 's'}${totalDurationText}</p>`);
 
             if (tour.description) {
                 parts.push(`<div class="location-detail-info-box">${formatText(tour.description)}</div>`);
@@ -1416,6 +1432,20 @@
                     }
                     parts.push('</div>');
                     parts.push('</li>');
+                    if (index < stops.length - 1 && segments[index]) {
+                        const seg = segments[index];
+                        const segDuration = seg.duration || '';
+                        const segDistance = seg.distance || '';
+                        let segText = '';
+                        if (segDuration && segDistance) {
+                            segText = `${segDuration} (${segDistance})`;
+                        } else if (segDuration) {
+                            segText = segDuration;
+                        }
+                        if (segText) {
+                            parts.push(`<li class="tour-segment-info" aria-label="Walking time to next stop"><span class="segment-arrow">↓</span> ${escapeHtml(segText)}</li>`);
+                        }
+                    }
                 });
                 parts.push('</ol>');
             } else {

@@ -499,7 +499,7 @@ main {
 }
 
 .tour-nav-controls {
-    display: none !important;
+    display: none;
     flex-direction: column;
     gap: 0.9rem;
     padding: 1rem;
@@ -883,6 +883,21 @@ main {
     margin: 0;
     font-size: 0.85rem;
     color: #475569;
+}
+
+.tour-segment-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0 0.5rem 1.5rem;
+    font-size: 0.85rem;
+    color: #64748b;
+    list-style: none;
+}
+
+.tour-segment-info .segment-arrow {
+    color: #0066cc;
+    font-weight: bold;
 }
 
 .tour-detail-empty {
