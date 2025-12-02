@@ -10,7 +10,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from .ai import CampusAiError, ChatMessage, get_landmark_context, run_landmark_chat
+from .ai import CampusAiError, ChatMessage, ChatResult, get_landmark_context, run_landmark_chat, TourAgentDeps
 from .models import Location, Bookmark, Tour, TourStop, TourBookmark
 from .forms import LocationForm
 from .route_utils import calculate_route_segments, RouteCalculationError
@@ -253,17 +253,28 @@ def chat_with_assistant(request):
 
     locations = list(Location.objects.all())
     landmark_context = get_landmark_context(locations)
+    locations_map = {loc.id: loc for loc in locations}
+
+    deps = TourAgentDeps(
+        user=request.user,
+        locations_map=locations_map,
+    )
 
     try:
-        reply = run_landmark_chat(
+        result = run_landmark_chat(
             message,
             history=chat_history,
             landmark_context=landmark_context,
+            deps=deps,
         )
     except CampusAiError as exc:
         return JsonResponse({'error': str(exc)}, status=503)
 
-    return JsonResponse({'reply': reply})
+    response_data = {'reply': result.reply}
+    if result.created_tour_id:
+        response_data['created_tour_id'] = result.created_tour_id
+
+    return JsonResponse(response_data)
 
 
 # -------------------------------------------------------------------------
