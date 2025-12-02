@@ -167,3 +167,70 @@ class TourStop(models.Model):
 
     def __str__(self) -> str:
         return f"{self.tour.name} - {self.location.name} (#{self.order})"
+
+
+class Rating(models.Model):
+    STATUS_CHOICES = [
+        ('new', 'New'),
+        ('reviewed', 'Reviewed'),
+        ('resolved', 'Resolved'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='ratings',
+        help_text="The user who submitted this rating.",
+    )
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.CASCADE,
+        related_name='ratings',
+        help_text="The location being rated.",
+    )
+    score = models.PositiveIntegerField(
+        choices=[(i, str(i)) for i in range(1, 6)],
+        help_text="Rating score from 1 to 5 stars.",
+    )
+    comment = models.TextField(
+        blank=True,
+        help_text="Optional feedback comment from the user.",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='new',
+        help_text="Admin review status of this feedback.",
+    )
+    admin_response = models.TextField(
+        blank=True,
+        help_text="Admin response to user feedback.",
+    )
+    responded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='feedback_responses',
+        help_text="Admin who responded to this feedback.",
+    )
+    responded_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the admin responded.",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this rating was submitted.",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When this rating was last updated.",
+    )
+
+    class Meta:
+        unique_together = ['user', 'location']
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.user.username} rated {self.location.name}: {self.score}/5"
