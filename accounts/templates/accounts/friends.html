@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Friends - GT Tour{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'accounts/discover.css' %}">
+<style>
+    .friends-tabs {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    .friends-tab {
+        padding: 0.75rem 1.5rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #6b7280;
+        transition: all 0.2s;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+    .friends-tab:hover {
+        color: #b3a369;
+    }
+    .friends-tab.active {
+        color: #b3a369;
+        border-bottom-color: #b3a369;
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    .friendship-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: box-shadow 0.2s;
+    }
+    .friendship-card:hover {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .friendship-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+    }
+    .friendship-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #b3a369 0%, #8b7e5a 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    .friendship-details h3 {
+        margin: 0 0 0.25rem 0;
+        font-size: 1.125rem;
+        color: #111827;
+    }
+    .friendship-details p {
+        margin: 0;
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    .friendship-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .btn-action {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .btn-accept {
+        background: #b3a369;
+        color: white;
+    }
+    .btn-accept:hover {
+        background: #8b7e5a;
+    }
+    .btn-reject, .btn-remove {
+        background: #ef4444;
+        color: white;
+    }
+    .btn-reject:hover, .btn-remove:hover {
+        background: #dc2626;
+    }
+    .btn-cancel {
+        background: #6b7280;
+        color: white;
+    }
+    .btn-cancel:hover {
+        background: #4b5563;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6b7280;
+    }
+    .empty-state p {
+        margin-bottom: 1rem;
+        font-size: 1.125rem;
+    }
+    .btn-secondary {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #b3a369;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+    .btn-secondary:hover {
+        background: #8b7e5a;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="discover-page">
+    <div class="discover-container">
+        <div class="discover-header">
+            <h2>Friends</h2>
+            <p class="discover-subtitle">Manage your connections and friend requests</p>
+        </div>
+
+        <div class="friends-tabs">
+            <button class="friends-tab active" data-tab="friends">
+                Friends <span>({{ friends_count }})</span>
+            </button>
+            <button class="friends-tab" data-tab="incoming">
+                Incoming Requests <span>({{ incoming_count }})</span>
+            </button>
+            <button class="friends-tab" data-tab="outgoing">
+                Sent Requests <span>({{ outgoing_count }})</span>
+            </button>
+        </div>
+
+        <!-- Friends Tab -->
+        <div id="friends-content" class="tab-content active">
+            {% if friends %}
+                {% for friend_data in friends %}
+                    <div class="friendship-card">
+                        <div class="friendship-info">
+                            <div class="friendship-avatar">
+                                {% if friend_data.user.first_name %}
+                                    {{ friend_data.user.first_name.0|upper }}
+                                {% else %}
+                                    {{ friend_data.user.username.0|upper }}
+                                {% endif %}
+                            </div>
+                            <div class="friendship-details">
+                                <h3>
+                                    <a href="{% url 'accounts:user_profile' friend_data.user.username %}" style="color: #111827; text-decoration: none;">
+                                        {% if friend_data.user.get_full_name %}
+                                            {{ friend_data.user.get_full_name }}
+                                        {% else %}
+                                            {{ friend_data.user.username }}
+                                        {% endif %}
+                                    </a>
+                                </h3>
+                                <p>@{{ friend_data.user.username }} • Friends since {{ friend_data.since|date:"M Y" }}</p>
+                            </div>
+                        </div>
+                        <div class="friendship-actions">
+                            <button class="btn-action btn-remove" onclick="removeFriend({{ friend_data.user.id }})">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>You don't have any friends yet.</p>
+                    <a href="{% url 'accounts:discover' %}" class="btn-secondary">Discover Users</a>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Incoming Requests Tab -->
+        <div id="incoming-content" class="tab-content">
+            {% if incoming_requests %}
+                {% for request in incoming_requests %}
+                    <div class="friendship-card" id="incoming-{{ request.id }}">
+                        <div class="friendship-info">
+                            <div class="friendship-avatar">
+                                {% if request.from_user.first_name %}
+                                    {{ request.from_user.first_name.0|upper }}
+                                {% else %}
+                                    {{ request.from_user.username.0|upper }}
+                                {% endif %}
+                            </div>
+                            <div class="friendship-details">
+                                <h3>
+                                    <a href="{% url 'accounts:user_profile' request.from_user.username %}" style="color: #111827; text-decoration: none;">
+                                        {% if request.from_user.get_full_name %}
+                                            {{ request.from_user.get_full_name }}
+                                        {% else %}
+                                            {{ request.from_user.username }}
+                                        {% endif %}
+                                    </a>
+                                </h3>
+                                <p>@{{ request.from_user.username }} • Sent {{ request.created_at|timesince }} ago</p>
+                            </div>
+                        </div>
+                        <div class="friendship-actions">
+                            <button class="btn-action btn-accept" onclick="respondToRequest({{ request.id }}, 'accept')">
+                                Accept
+                            </button>
+                            <button class="btn-action btn-reject" onclick="respondToRequest({{ request.id }}, 'reject')">
+                                Reject
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No pending friend requests.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Outgoing Requests Tab -->
+        <div id="outgoing-content" class="tab-content">
+            {% if outgoing_requests %}
+                {% for request in outgoing_requests %}
+                    <div class="friendship-card" id="outgoing-{{ request.id }}">
+                        <div class="friendship-info">
+                            <div class="friendship-avatar">
+                                {% if request.to_user.first_name %}
+                                    {{ request.to_user.first_name.0|upper }}
+                                {% else %}
+                                    {{ request.to_user.username.0|upper }}
+                                {% endif %}
+                            </div>
+                            <div class="friendship-details">
+                                <h3>
+                                    <a href="{% url 'accounts:user_profile' request.to_user.username %}" style="color: #111827; text-decoration: none;">
+                                        {% if request.to_user.get_full_name %}
+                                            {{ request.to_user.get_full_name }}
+                                        {% else %}
+                                            {{ request.to_user.username }}
+                                        {% endif %}
+                                    </a>
+                                </h3>
+                                <p>@{{ request.to_user.username }} • Sent {{ request.created_at|timesince }} ago</p>
+                            </div>
+                        </div>
+                        <div class="friendship-actions">
+                            <button class="btn-action btn-cancel" onclick="removeFriend({{ request.to_user.id }})">
+                                Cancel Request
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No pending outgoing requests.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<script>
+    // Tab switching
+    document.querySelectorAll('.friends-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            
+            // Update active tab
+            document.querySelectorAll('.friends-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update active content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tabName}-content`).classList.add('active');
+        });
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    async function respondToRequest(friendshipId, action) {
+        const csrftoken = getCookie('csrftoken');
+        
+        try {
+            const response = await fetch(`/accounts/friends/respond/${friendshipId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({ action })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.error || 'An error occurred');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred');
+        }
+    }
+
+    async function removeFriend(userId) {
+        if (!confirm('Are you sure you want to remove this friend?')) {
+            return;
+        }
+        
+        const csrftoken = getCookie('csrftoken');
+        
+        try {
+            const response = await fetch(`/accounts/friends/remove/${userId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.error || 'An error occurred');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred');
+        }
+    }
+</script>
+{% endblock %}

@@ -9,11 +9,13 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.db.models import Q
 
 from .ai import CampusAiError, ChatMessage, ChatResult, get_landmark_context, run_landmark_chat, TourAgentDeps
-from .models import Location, Bookmark, Tour, TourStop, TourBookmark
+from .models import Location, Bookmark, Tour, TourStop, TourBookmark, SharedTour
 from .forms import LocationForm
 from .route_utils import calculate_route_segments, RouteCalculationError
+from accounts.models import Friendship
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +172,11 @@ def tour_manage(request):
                     'category': stop.location.category,
                 }
             })
+        
+        # Get shares for this tour
+        shares = SharedTour.objects.filter(tour=tour).select_related('shared_with')
+        shared_with = [{'id': s.shared_with.id, 'username': s.shared_with.username, 'share_id': s.id} for s in shares]
+        
         tours_payload.append({
             'id': tour.id,
             'name': tour.name,
@@ -177,6 +184,7 @@ def tour_manage(request):
             'created_at': tour.created_at.isoformat(),
             'stops': stops,
             'is_bookmarked': tour.id in bookmarked_tour_ids,
+            'shared_with': shared_with,
         })
 
     locations_payload = [
@@ -194,12 +202,85 @@ def tour_manage(request):
         for location in locations
     ]
 
+    # Get user's friends for sharing
+    friends_outgoing = Friendship.objects.filter(
+        from_user=request.user, status='accepted'
+    ).select_related('to_user')
+    
+    friends_incoming = Friendship.objects.filter(
+        to_user=request.user, status='accepted'
+    ).select_related('from_user')
+    
+    friends = []
+    friend_ids = set()
+    
+    for friendship in friends_outgoing:
+        if friendship.to_user.id not in friend_ids:
+            friends.append({
+                'id': friendship.to_user.id,
+                'username': friendship.to_user.username,
+                'display_name': friendship.to_user.get_full_name() or friendship.to_user.username,
+            })
+            friend_ids.add(friendship.to_user.id)
+    
+    for friendship in friends_incoming:
+        if friendship.from_user.id not in friend_ids:
+            friends.append({
+                'id': friendship.from_user.id,
+                'username': friendship.from_user.username,
+                'display_name': friendship.from_user.get_full_name() or friendship.from_user.username,
+            })
+            friend_ids.add(friendship.from_user.id)
+    
+    friends.sort(key=lambda x: x['username'])
+
+    # Get tours shared with the user
+    shared_with_user = SharedTour.objects.filter(
+        shared_with=request.user
+    ).select_related('tour', 'shared_by', 'tour__user').prefetch_related('tour__stops__location')
+    
+    shared_tours_payload = []
+    for share in shared_with_user:
+        tour = share.tour
+        stops = []
+        for stop in tour.stops.all():
+            stops.append({
+                'id': stop.id,
+                'location_id': stop.location.id,
+                'order': stop.order,
+                'location': {
+                    'id': stop.location.id,
+                    'name': stop.location.name,
+                    'slug': stop.location.slug,
+                    'description': stop.location.description,
+                    'latitude': float(stop.location.latitude),
+                    'longitude': float(stop.location.longitude),
+                    'address': stop.location.address,
+                    'category': stop.location.category,
+                }
+            })
+        
+        shared_tours_payload.append({
+            'share_id': share.id,
+            'tour_id': tour.id,
+            'name': tour.name,
+            'description': tour.description,
+            'created_at': tour.created_at.isoformat(),
+            'shared_by': share.shared_by.username,
+            'shared_by_display': share.shared_by.get_full_name() or share.shared_by.username,
+            'shared_at': share.created_at.isoformat(),
+            'stops': stops,
+            'route_data': tour.route_data,
+        })
+
     context = {
         'tours': tours,
         'tours_payload': tours_payload,
         'locations': locations,
         'locations_payload': locations_payload,
         'bookmarked_tour_ids': bookmarked_tour_ids,
+        'friends': friends,
+        'shared_tours': shared_tours_payload,
     }
     return render(request, 'campus/tour_manage.html', context)
 
@@ -629,3 +710,139 @@ def tour_detail(request, tour_id):
         return JsonResponse({'success': True}, status=200)
     else:
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+
+# -------------------------------------------------------------------------
+#  TOUR SHARING VIEWS (User Story #11)
+# -------------------------------------------------------------------------
+@login_required
+@require_POST
+def share_tour(request, tour_id):
+    """Share a tour with one or more friends."""
+    tour = get_object_or_404(Tour, id=tour_id)
+    
+    # Validate tour ownership
+    if tour.user != request.user:
+        return JsonResponse({'error': 'You can only share your own tours.'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        friend_ids = data.get('friend_ids', [])
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid request.'}, status=400)
+    
+    if not isinstance(friend_ids, list) or not friend_ids:
+        return JsonResponse({'error': 'friend_ids must be a non-empty array.'}, status=400)
+    
+    shared_count = 0
+    already_shared = []
+    not_friends = []
+    
+    for friend_id in friend_ids:
+        try:
+            friend_id = int(friend_id)
+        except (ValueError, TypeError):
+            continue
+        
+        # Check if users are friends
+        is_friend = Friendship.objects.filter(
+            Q(from_user=request.user, to_user_id=friend_id, status='accepted') |
+            Q(from_user_id=friend_id, to_user=request.user, status='accepted')
+        ).exists()
+        
+        if not is_friend:
+            not_friends.append(friend_id)
+            continue
+        
+        # Check if already shared
+        existing = SharedTour.objects.filter(tour=tour, shared_with_id=friend_id).first()
+        if existing:
+            already_shared.append(friend_id)
+            continue
+        
+        # Create share
+        SharedTour.objects.create(
+            tour=tour,
+            shared_by=request.user,
+            shared_with_id=friend_id,
+        )
+        shared_count += 1
+    
+    response = {
+        'success': True,
+        'shared_count': shared_count,
+    }
+    
+    if already_shared:
+        response['already_shared'] = already_shared
+    if not_friends:
+        response['not_friends'] = not_friends
+    
+    return JsonResponse(response)
+
+
+@login_required
+def shared_tours_list(request):
+    """Get all tours shared with the current user."""
+    shared_tours = SharedTour.objects.filter(
+        shared_with=request.user
+    ).select_related('tour', 'shared_by', 'tour__user').prefetch_related('tour__stops__location')
+    
+    tours_data = []
+    for share in shared_tours:
+        tour = share.tour
+        stops = []
+        for stop in tour.stops.all():
+            stops.append({
+                'id': stop.id,
+                'location_id': stop.location.id,
+                'order': stop.order,
+                'location': {
+                    'id': stop.location.id,
+                    'name': stop.location.name,
+                    'slug': stop.location.slug,
+                    'description': stop.location.description,
+                    'latitude': float(stop.location.latitude),
+                    'longitude': float(stop.location.longitude),
+                    'address': stop.location.address,
+                    'category': stop.location.category,
+                }
+            })
+        
+        tours_data.append({
+            'share_id': share.id,
+            'tour_id': tour.id,
+            'name': tour.name,
+            'description': tour.description,
+            'created_at': tour.created_at.isoformat(),
+            'shared_by': share.shared_by.username,
+            'shared_by_id': share.shared_by.id,
+            'shared_at': share.created_at.isoformat(),
+            'stops': stops,
+            'route_data': tour.route_data,
+        })
+    
+    return JsonResponse({'tours': tours_data})
+
+
+@login_required
+@require_http_methods(['DELETE'])
+def remove_shared_tour(request, share_id):
+    """Remove a shared tour from the recipient's list."""
+    share = get_object_or_404(SharedTour, id=share_id, shared_with=request.user)
+    share.delete()
+    return JsonResponse({'success': True, 'message': 'Shared tour removed.'})
+
+
+@login_required
+@require_http_methods(['DELETE'])
+def revoke_tour_share(request, share_id):
+    """Tour owner revokes sharing from a specific user."""
+    share = get_object_or_404(SharedTour, id=share_id)
+    
+    # Validate ownership
+    if share.tour.user != request.user:
+        return JsonResponse({'error': 'You can only revoke shares of your own tours.'}, status=403)
+    
+    share.delete()
+    return JsonResponse({'success': True, 'message': 'Tour sharing revoked.'})

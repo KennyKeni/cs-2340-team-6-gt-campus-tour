@@ -4,11 +4,14 @@ from django.contrib.auth.models import User
 from django.shortcuts import redirect, render, get_object_or_404
 from django.db.models import Count, Q
 from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+import json
 
 from campus.models import Bookmark, Tour, TourBookmark
 
 from .forms import CustomUserCreationForm, ProfileEditForm
-from .models import UserProfile
+from .models import UserProfile, Friendship
 
 
 def register(request):
@@ -197,6 +200,20 @@ def view_user_profile(request, username):
     name_for_initial = user.first_name or user.username or '?'
     initial = name_for_initial[0].upper()
 
+    # Check friendship status
+    friendship_status = None
+    friendship_id = None
+    outgoing = Friendship.objects.filter(from_user=request.user, to_user=user).first()
+    incoming = Friendship.objects.filter(from_user=user, to_user=request.user).first()
+    
+    if outgoing:
+        friendship_status = outgoing.status
+        friendship_id = outgoing.id
+    elif incoming:
+        if incoming.status == 'accepted':
+            friendship_status = 'accepted'
+            friendship_id = incoming.id
+
     context = {
         'profile_user': user,
         'user_profile': user_profile,
@@ -206,5 +223,141 @@ def view_user_profile(request, username):
         'location_count': len(location_bookmarks),
         'tour_count': len(created_tours),
         'created_tours': created_tours,
+        'friendship_status': friendship_status,
+        'friendship_id': friendship_id,
     }
     return render(request, 'accounts/user_profile.html', context)
+
+
+@login_required
+def friends_list(request):
+    """Display friends, pending incoming/outgoing requests."""
+    # Get accepted friendships (both directions)
+    friends_outgoing = Friendship.objects.filter(
+        from_user=request.user, status='accepted'
+    ).select_related('to_user', 'to_user__profile')
+    
+    friends_incoming = Friendship.objects.filter(
+        to_user=request.user, status='accepted'
+    ).select_related('from_user', 'from_user__profile')
+    
+    # Combine into a single friends list
+    friends = []
+    friend_ids = set()
+    
+    for friendship in friends_outgoing:
+        if friendship.to_user.id not in friend_ids:
+            friends.append({
+                'user': friendship.to_user,
+                'friendship_id': friendship.id,
+                'since': friendship.created_at,
+            })
+            friend_ids.add(friendship.to_user.id)
+    
+    for friendship in friends_incoming:
+        if friendship.from_user.id not in friend_ids:
+            friends.append({
+                'user': friendship.from_user,
+                'friendship_id': friendship.id,
+                'since': friendship.created_at,
+            })
+            friend_ids.add(friendship.from_user.id)
+    
+    # Sort by username
+    friends.sort(key=lambda x: x['user'].username)
+    
+    # Get incoming pending requests
+    incoming_requests = Friendship.objects.filter(
+        to_user=request.user, status='pending'
+    ).select_related('from_user', 'from_user__profile')
+    
+    # Get outgoing pending requests
+    outgoing_requests = Friendship.objects.filter(
+        from_user=request.user, status='pending'
+    ).select_related('to_user', 'to_user__profile')
+    
+    context = {
+        'friends': friends,
+        'incoming_requests': incoming_requests,
+        'outgoing_requests': outgoing_requests,
+        'friends_count': len(friends),
+        'incoming_count': incoming_requests.count(),
+        'outgoing_count': outgoing_requests.count(),
+    }
+    return render(request, 'accounts/friends.html', context)
+
+
+@login_required
+@require_POST
+def send_friend_request(request, user_id):
+    """Send a friend request to another user."""
+    to_user = get_object_or_404(User, id=user_id)
+    
+    # Can't friend yourself
+    if to_user == request.user:
+        return JsonResponse({'error': 'Cannot send friend request to yourself.'}, status=400)
+    
+    # Check if friendship already exists (in either direction)
+    existing = Friendship.objects.filter(
+        Q(from_user=request.user, to_user=to_user) |
+        Q(from_user=to_user, to_user=request.user)
+    ).first()
+    
+    if existing:
+        if existing.status == 'accepted':
+            return JsonResponse({'error': 'Already friends.'}, status=400)
+        elif existing.status == 'pending':
+            return JsonResponse({'error': 'Friend request already pending.'}, status=400)
+        elif existing.status == 'rejected':
+            # Allow re-sending after rejection
+            existing.status = 'pending'
+            existing.from_user = request.user
+            existing.to_user = to_user
+            existing.save()
+            return JsonResponse({'success': True, 'message': 'Friend request sent.'})
+    
+    # Create new friendship request
+    Friendship.objects.create(from_user=request.user, to_user=to_user, status='pending')
+    return JsonResponse({'success': True, 'message': 'Friend request sent.'})
+
+
+@login_required
+@require_POST
+def respond_to_request(request, friendship_id):
+    """Accept or reject a friend request."""
+    friendship = get_object_or_404(Friendship, id=friendship_id, to_user=request.user, status='pending')
+    
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid request.'}, status=400)
+    
+    if action == 'accept':
+        friendship.status = 'accepted'
+        friendship.save()
+        return JsonResponse({'success': True, 'message': 'Friend request accepted.'})
+    elif action == 'reject':
+        friendship.status = 'rejected'
+        friendship.save()
+        return JsonResponse({'success': True, 'message': 'Friend request rejected.'})
+    else:
+        return JsonResponse({'error': 'Invalid action.'}, status=400)
+
+
+@login_required
+@require_POST
+def remove_friend(request, user_id):
+    """Remove a friend (delete friendship in both directions)."""
+    user = get_object_or_404(User, id=user_id)
+    
+    # Delete friendships in both directions
+    deleted_count = Friendship.objects.filter(
+        Q(from_user=request.user, to_user=user) |
+        Q(from_user=user, to_user=request.user)
+    ).delete()[0]
+    
+    if deleted_count > 0:
+        return JsonResponse({'success': True, 'message': 'Friend removed.'})
+    else:
+        return JsonResponse({'error': 'No friendship found.'}, status=404)
