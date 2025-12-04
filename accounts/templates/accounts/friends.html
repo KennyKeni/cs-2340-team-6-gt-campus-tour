@@ -318,7 +318,7 @@
 
     async function respondToRequest(friendshipId, action) {
         const csrftoken = getCookie('csrftoken');
-        
+
         try {
             const response = await fetch(`/accounts/friends/respond/${friendshipId}/`, {
                 method: 'POST',
@@ -328,18 +328,28 @@
                 },
                 body: JSON.stringify({ action })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
-                alert(data.message);
-                location.reload();
+                showToast(data.message, 'success');
+                const card = document.getElementById(`incoming-${friendshipId}`);
+                if (card) {
+                    card.style.animation = 'fadeOut 0.3s ease-out forwards';
+                    setTimeout(() => {
+                        card.remove();
+                        updateCounts();
+                    }, 300);
+                }
+                if (action === 'accept') {
+                    setTimeout(() => location.reload(), 1000);
+                }
             } else {
-                alert(data.error || 'An error occurred');
+                showToast(data.error || 'An error occurred', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            showToast('An error occurred', 'error');
         }
     }
 
@@ -347,9 +357,9 @@
         if (!confirm('Are you sure you want to remove this friend?')) {
             return;
         }
-        
+
         const csrftoken = getCookie('csrftoken');
-        
+
         try {
             const response = await fetch(`/accounts/friends/remove/${userId}/`, {
                 method: 'POST',
@@ -358,19 +368,32 @@
                     'X-CSRFToken': csrftoken
                 }
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
-                alert(data.message);
-                location.reload();
+                showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert(data.error || 'An error occurred');
+                showToast(data.error || 'An error occurred', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            showToast('An error occurred', 'error');
         }
     }
+
+    function updateCounts() {
+        const incomingCount = document.querySelectorAll('#incoming-content .friendship-card').length;
+        const incomingTab = document.querySelector('[data-tab="incoming"] span');
+        if (incomingTab) incomingTab.textContent = `(${incomingCount})`;
+    }
 </script>
+
+<style>
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(20px); }
+}
+</style>
 {% endblock %}

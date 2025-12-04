@@ -230,19 +230,16 @@
             if (data.success) {
                 let message = `Tour shared with ${data.shared_count} friend${data.shared_count !== 1 ? 's' : ''}!`;
                 if (data.already_shared && data.already_shared.length > 0) {
-                    message += `\n${data.already_shared.length} already had access.`;
+                    message += ` (${data.already_shared.length} already had access)`;
                 }
-                if (data.not_friends && data.not_friends.length > 0) {
-                    message += `\n${data.not_friends.length} user(s) skipped (not friends).`;
-                }
-                alert(message);
+                showToast(message, 'success');
                 closeShareModal();
             } else {
-                alert(data.error || 'Failed to share tour.');
+                showToast(data.error || 'Failed to share tour.', 'error');
             }
         } catch (error) {
             console.error('Error sharing tour:', error);
-            alert('An error occurred while sharing the tour.');
+            showToast('An error occurred while sharing the tour.', 'error');
         }
     };
 
@@ -264,15 +261,16 @@
             if (data.success) {
                 const card = document.querySelector(`.shared-tour-card[data-share-id="${shareId}"]`);
                 if (card) {
-                    card.remove();
+                    card.style.animation = 'fadeOutCard 0.3s ease-out forwards';
+                    setTimeout(() => card.remove(), 300);
                 }
-                alert('Shared tour removed.');
+                showToast('Shared tour removed.', 'success');
             } else {
-                alert(data.error || 'Failed to remove shared tour.');
+                showToast(data.error || 'Failed to remove shared tour.', 'error');
             }
         } catch (error) {
             console.error('Error removing shared tour:', error);
-            alert('An error occurred.');
+            showToast('An error occurred.', 'error');
         }
     };
 
@@ -806,6 +804,11 @@
     gap: 1rem;
     padding: 1.5rem;
     border-top: 1px solid #e5e7eb;
+}
+
+@keyframes fadeOutCard {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
 }
 
 @media (max-width: 768px) {
