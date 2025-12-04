@@ -12,6 +12,18 @@
                 <option value="locations" selected>Locations</option>
                 <option value="tours">Tours</option>
             </select>
+            <label class="visually-hidden" for="category-filter">Filter by category</label>
+            <select id="category-filter" class="sidebar-select" aria-label="Filter locations by category">
+                <option value="">All Categories</option>
+                <option value="academic">Academic</option>
+                <option value="arts">Arts</option>
+                <option value="athletics">Athletics</option>
+                <option value="food">Food</option>
+                <option value="green spaces">Green Spaces</option>
+                <option value="historic">Historic</option>
+                <option value="student life">Student Life</option>
+                <option value="sustainability">Sustainability</option>
+            </select>
             <div class="sidebar-search">
                 <label class="visually-hidden" for="location-search">Search locations</label>
                 <input id="location-search" type="search" placeholder="Search locations..." autocomplete="off">
@@ -224,6 +236,7 @@
         });
 
         const infoWindow = new google.maps.InfoWindow();
+        window.locationMarkers = [];
 
         locationData.forEach((location) => {
             const marker = new google.maps.Marker({
@@ -238,6 +251,14 @@
                     strokeColor: '#003057',
                     strokeWeight: 2,
                 },
+            });
+
+            window.locationMarkers.push({
+                marker: marker,
+                name: location.name,
+                category: location.category,
+                address: location.address,
+                description: location.description,
             });
 
             marker.addListener('click', () => {
@@ -328,6 +349,7 @@
     (function () {
         const viewSelect = document.getElementById('sidebar-view');
         const searchInput = document.getElementById('location-search');
+        const categoryFilter = document.getElementById('category-filter');
         const locationSection = document.getElementById('location-list-section');
         const toursSection = document.getElementById('tour-list-section');
         const locationListView = document.getElementById('location-list-view');
@@ -379,6 +401,7 @@
 
         function applyFilter() {
             const query = searchInput.value.trim().toLowerCase();
+            const selectedCategory = categoryFilter ? categoryFilter.value.toLowerCase() : '';
             let visibleCount = 0;
 
             locationItems.forEach((item) => {
@@ -389,7 +412,11 @@
                     item.dataset.description,
                 ].join(' ');
 
-                const matches = !query || haystack.includes(query);
+                const matchesSearch = !query || haystack.includes(query);
+                const itemCategory = (item.dataset.category || '').toLowerCase();
+                const matchesCategory = !selectedCategory || itemCategory === selectedCategory;
+                const matches = matchesSearch && matchesCategory;
+
                 item.hidden = !matches;
                 if (matches) {
                     visibleCount += 1;
@@ -397,6 +424,29 @@
             });
 
             updateEmptyState(visibleCount);
+            updateMapMarkers(selectedCategory, searchInput.value.trim().toLowerCase());
+        }
+
+        function updateMapMarkers(selectedCategory, searchQuery) {
+            if (!window.locationMarkers) {
+                return;
+            }
+
+            window.locationMarkers.forEach((markerData) => {
+                const category = (markerData.category || '').toLowerCase();
+                const haystack = [
+                    markerData.name || '',
+                    markerData.category || '',
+                    markerData.address || '',
+                    markerData.description || '',
+                ].join(' ').toLowerCase();
+
+                const matchesSearch = !searchQuery || haystack.includes(searchQuery);
+                const matchesCategory = !selectedCategory || category === selectedCategory;
+                const isVisible = matchesSearch && matchesCategory;
+
+                markerData.marker.setVisible(isVisible);
+            });
         }
 
         function reorderLocationCards() {
@@ -716,6 +766,9 @@
                 toursSection.hidden = true;
                 window.campusTours?.showTourList?.({ restoreFocus: false, clearRoute: true });
                 showLocationList();
+                if (categoryFilter) {
+                    categoryFilter.disabled = false;
+                }
             } else {
                 locationSection.hidden = true;
                 toursSection.hidden = false;
@@ -723,6 +776,10 @@
                 searchInput.value = '';
                 searchInput.disabled = true;
                 searchInput.placeholder = 'Search disabled for tours';
+                if (categoryFilter) {
+                    categoryFilter.disabled = true;
+                    categoryFilter.value = '';
+                }
                 updateEmptyState(locationItems.length);
             }
         }
@@ -742,6 +799,9 @@
 
         viewSelect.addEventListener('change', toggleView);
         searchInput.addEventListener('input', applyFilter);
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', applyFilter);
+        }
 
         toggleView();
 

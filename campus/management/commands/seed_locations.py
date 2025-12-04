@@ -410,6 +410,122 @@ class Command(BaseCommand):
                 'address': '349 Ferst Dr NW, Atlanta, GA 30332',
                 'category': 'Arts',
             },
+            {
+                'name': 'Tech Green',
+                'slug': 'tech-green',
+                'description': (
+                    'A large open lawn in the heart of campus, perfect for relaxation, events, and outdoor activities.'
+                ),
+                'historical_info': (
+                    'Tech Green is the central green space on the Georgia Tech campus, serving as a gathering place '
+                    'for students, faculty, and visitors. The expansive lawn is bordered by some of the most iconic '
+                    'buildings on campus, including the Clough Undergraduate Learning Commons, Price Gilbert Library, '
+                    'and the John Lewis Student Center. '
+                    '\n\n'
+                    'The green space hosts numerous campus events throughout the year, from outdoor concerts and '
+                    'festivals to student organization activities and informal recreation. Students often use Tech '
+                    'Green for studying outdoors, playing frisbee, or simply enjoying the Atlanta weather between '
+                    'classes. '
+                    '\n\n'
+                    'The Kessler Campanile, a distinctive bell tower, stands at one end of Tech Green and has become '
+                    'a beloved landmark and meeting spot for the Georgia Tech community. The campanile plays music '
+                    'at regular intervals and serves as a focal point for the green space. '
+                    '\n\n'
+                    'Tech Green represents Georgia Tech\'s commitment to creating inviting outdoor spaces that '
+                    'enhance campus life and provide a respite from the urban environment of Midtown Atlanta.'
+                ),
+                'latitude': Decimal('33.7745'),
+                'longitude': Decimal('-84.3985'),
+                'address': 'Tech Green, Atlanta, GA 30332',
+                'category': 'Green Spaces',
+            },
+            {
+                'name': 'Brittain Dining Hall',
+                'slug': 'brittain-dining-hall',
+                'description': (
+                    'A historic all-you-care-to-eat dining hall serving the east side of campus with diverse meal options.'
+                ),
+                'historical_info': (
+                    'Brittain Dining Hall, commonly known as "Brittain" or "East Side Dining," is one of the main '
+                    'dining facilities on the Georgia Tech campus. The building features distinctive Gothic '
+                    'architecture that reflects the historic character of the east side of campus. '
+                    '\n\n'
+                    'The dining hall operates as an all-you-care-to-eat facility, offering a wide variety of food '
+                    'stations including home-style cooking, international cuisine, a grill, salad bar, and dessert '
+                    'options. The facility is especially popular with students living in the nearby residence halls '
+                    'on the east side of campus. '
+                    '\n\n'
+                    'Brittain Dining Hall accepts meal plans and BuzzCard payments, making it a convenient option '
+                    'for students throughout the day. The historic building has been updated over the years to '
+                    'include modern food service equipment while maintaining its classic architectural charm. '
+                    '\n\n'
+                    'The dining hall serves as more than just a place to eat - it\'s a social hub where students '
+                    'gather between classes, study groups meet for meals, and the Georgia Tech community comes '
+                    'together over food.'
+                ),
+                'latitude': Decimal('33.7726'),
+                'longitude': Decimal('-84.3912'),
+                'address': '215 Bobby Dodd Way NW, Atlanta, GA 30332',
+                'category': 'Food',
+            },
+            {
+                'name': 'Eco-Commons',
+                'slug': 'eco-commons',
+                'description': (
+                    'A sustainable landscape and passive recreation area showcasing native plants and green infrastructure.'
+                ),
+                'historical_info': (
+                    'The Eco-Commons is a high-performance landscape project that transforms former surface parking '
+                    'lots into a sustainable green space on the Georgia Tech campus. The project is part of Georgia '
+                    'Tech\'s broader commitment to sustainability and creating environmentally responsible campus '
+                    'spaces. '
+                    '\n\n'
+                    'Located adjacent to the Kendeda Building for Innovative Sustainable Design, the Eco-Commons '
+                    'features native Piedmont Forest vegetation, bioswales for stormwater management, and walking '
+                    'paths that encourage passive recreation and connection with nature. '
+                    '\n\n'
+                    'The landscape serves as a living laboratory for sustainability research and education, '
+                    'demonstrating how urban campuses can incorporate green infrastructure to manage stormwater, '
+                    'reduce heat island effects, and provide habitat for pollinators and wildlife. '
+                    '\n\n'
+                    'The Eco-Commons represents a shift in campus planning philosophy, prioritizing green space '
+                    'and environmental performance over surface parking. The project has received recognition for '
+                    'its innovative approach to sustainable landscape design in an urban context.'
+                ),
+                'latitude': Decimal('33.7790'),
+                'longitude': Decimal('-84.3998'),
+                'address': 'Ferst Dr NW, Atlanta, GA 30332',
+                'category': 'Green Spaces',
+            },
+            {
+                'name': 'North Avenue Dining Hall',
+                'slug': 'north-ave-dining-hall',
+                'description': (
+                    'The largest dining facility on campus, offering diverse food options in a modern setting.'
+                ),
+                'historical_info': (
+                    'North Avenue Dining Hall, often called "Nav" by students, is the largest and most popular '
+                    'dining facility on the Georgia Tech campus. Located on North Avenue near the center of campus, '
+                    'the dining hall serves thousands of students daily with its all-you-care-to-eat format. '
+                    '\n\n'
+                    'The facility underwent a major renovation and expansion to create a modern dining experience '
+                    'with multiple food stations offering diverse cuisine options. Stations include American '
+                    'classics, international dishes, pizza, deli sandwiches, a salad bar, vegan and vegetarian '
+                    'options, and rotating specialty items. '
+                    '\n\n'
+                    'North Avenue Dining Hall is known for its spacious seating areas, including both indoor and '
+                    'outdoor options. The facility\'s central location makes it convenient for students traveling '
+                    'between classes on different parts of campus. '
+                    '\n\n'
+                    'The dining hall operates on meal plan swipes and accepts BuzzCard payment. Extended hours '
+                    'during the academic year accommodate students with varying schedules, making it a reliable '
+                    'option for breakfast, lunch, dinner, and late-night meals.'
+                ),
+                'latitude': Decimal('33.7708'),
+                'longitude': Decimal('-84.3914'),
+                'address': '120 North Ave NW, Atlanta, GA 30332',
+                'category': 'Food',
+            },
         ]
 
         created_count = 0
