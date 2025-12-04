@@ -234,3 +234,17 @@ class Rating(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.username} rated {self.location.name}: {self.score}/5"
+
+
+class SharedTour(models.Model):
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='shares')
+    shared_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tours_shared')
+    shared_with = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tours_received')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('tour', 'shared_with')
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.shared_by.username} shared {self.tour.name} with {self.shared_with.username}"

@@ -36,4 +36,12 @@ urlpatterns = [
     path('tours/<int:tour_id>/edit/', views.tour_create, name='tour-edit'),
     path('api/tours/', views.tour_list, name='tour-list'),
     path('api/tours/<int:tour_id>/', views.tour_detail, name='tour-detail'),
+    
+    # ---------------------------------------------------------------------
+    # Tour sharing endpoints (User Story #11)
+    # ---------------------------------------------------------------------
+    path('api/tours/<int:tour_id>/share/', views.share_tour, name='share_tour'),
+    path('api/tours/shared/', views.shared_tours_list, name='shared_tours_list'),
+    path('api/tours/shared/<int:share_id>/', views.remove_shared_tour, name='remove_shared_tour'),
+    path('api/tours/shared/<int:share_id>/revoke/', views.revoke_tour_share, name='revoke_tour_share'),
 ]
