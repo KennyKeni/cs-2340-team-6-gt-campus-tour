@@ -481,6 +481,13 @@ main {
     gap: 0.75rem;
 }
 
+
+.tour-shared-by {
+    margin: 0.25rem 0 0.5rem;
+    font-size: 0.85rem;
+    color: #059669;
+}
+
 .create-tour-btn {
     display: inline-flex;
     align-items: center;
@@ -654,6 +661,16 @@ main {
 .tour-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 24px rgba(217, 119, 6, 0.18);
+}
+
+.tour-card.shared-tour-card {
+    background: linear-gradient(145deg, #e0f2fe, #bae6fd);
+    border: 1px solid rgba(14, 165, 233, 0.18);
+    box-shadow: 0 6px 18px rgba(14, 165, 233, 0.12);
+}
+
+.tour-card.shared-tour-card:hover {
+    box-shadow: 0 12px 24px rgba(14, 165, 233, 0.18);
 }
 
 .tour-card:focus-visible {

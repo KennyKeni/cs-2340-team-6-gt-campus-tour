@@ -87,7 +87,7 @@
                 </div>
                 <div id="tour-list-view" class="tour-list-view">
                     <p class="sidebar-support-text">Select a tour to preview its stops and highlight the full route on the map.</p>
-                    <div id="tour-items" class="tour-list">
+                    <div id="tour-items" class="tour-list" data-filter="my-tours">
                         {% for tour in tours %}
                         <article class="tour-card"
                                  data-tour-id="{{ tour.id }}"
@@ -96,6 +96,7 @@
                                  data-tour-stop-count="{{ tour.stops.count }}"
                                  data-tour-edit-url="{% url 'campus:tour-edit' tour.id %}"
                                  data-bookmarked="{% if tour.id in bookmarked_tour_ids %}true{% else %}false{% endif %}"
+                                 data-tour-type="owned"
                                  role="button"
                                  tabindex="0">
                             <div class="tour-card-header">
@@ -124,8 +125,50 @@
                             {% endif %}
                         </article>
                         {% empty %}
-                        <p class="sidebar-empty">No tours yet. <a href="{% url 'campus:tour-create' %}">Create your first tour</a>!</p>
+                        <p class="sidebar-empty" id="no-my-tours">No tours yet. <a href="{% url 'campus:tour-create' %}">Create your first tour</a>!</p>
                         {% endfor %}
+
+                        {% for shared in shared_tours %}
+                        <article class="tour-card shared-tour-card"
+                                 data-tour-id="{{ shared.tour.id }}"
+                                 data-share-id="{{ shared.share_id }}"
+                                 data-tour-name="{{ shared.tour.name|escape }}"
+                                 data-tour-description="{{ shared.tour.description|default_if_none:''|escape }}"
+                                 data-tour-stop-count="{{ shared.tour.stops.count }}"
+                                 data-shared-by="{{ shared.shared_by.username }}"
+                                 data-shared-by-display="{{ shared.shared_by.get_full_name|default:shared.shared_by.username }}"
+                                 data-bookmarked="{% if shared.tour.id in bookmarked_tour_ids %}true{% else %}false{% endif %}"
+                                 data-tour-type="shared"
+                                 role="button"
+                                 tabindex="0">
+                            <div class="tour-card-header">
+                                <div>
+                                    <h3 class="tour-title">{{ shared.tour.name }}</h3>
+                                    <p class="tour-stops-count">{{ shared.tour.stops.count }} stop{{ shared.tour.stops.count|pluralize }} &middot; by {{ shared.shared_by.username }}</p>
+                                </div>
+                                <div class="tour-card-actions">
+                                    <button class="tour-bookmark-btn sidebar-tour-bookmark"
+                                            data-tour-id="{{ shared.tour.id }}"
+                                            data-bookmarked="{% if shared.tour.id in bookmarked_tour_ids %}true{% else %}false{% endif %}"
+                                            title="{% if shared.tour.id in bookmarked_tour_ids %}Remove bookmark{% else %}Add bookmark{% endif %}"
+                                            aria-label="Bookmark {{ shared.tour.name }}">
+                                        <svg class="bookmark-icon {% if shared.tour.id in bookmarked_tour_ids %}bookmarked{% endif %}"
+                                             width="20" height="20" viewBox="0 0 24 24"
+                                             fill="{% if shared.tour.id in bookmarked_tour_ids %}currentColor{% else %}none{% endif %}"
+                                             stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                                        </svg>
+                                    </button>
+                                    <span class="tour-card-indicator" aria-hidden="true">›</span>
+                                </div>
+                            </div>
+                            {% if shared.tour.description %}
+                            <p class="tour-description-preview">{{ shared.tour.description|truncatewords:22 }}</p>
+                            {% endif %}
+                        </article>
+                        {% endfor %}
+                        <p class="sidebar-empty" id="no-shared-tours" hidden>No tours have been shared with you yet.</p>
+                        <p class="sidebar-empty" id="no-tours-match" hidden>No tours match your search.</p>
                     </div>
                 </div>
                 <div id="tour-detail-view" class="location-detail-view" hidden>
@@ -758,6 +801,24 @@
             });
         }
 
+        const locationCategoryOptions = `
+            <option value="">All Categories</option>
+            <option value="academic">Academic</option>
+            <option value="arts">Arts</option>
+            <option value="athletics">Athletics</option>
+            <option value="food">Food</option>
+            <option value="green spaces">Green Spaces</option>
+            <option value="historic">Historic</option>
+            <option value="student life">Student Life</option>
+            <option value="sustainability">Sustainability</option>
+        `;
+
+        const tourFilterOptions = `
+            <option value="">All Tours</option>
+            <option value="my-tours">My Tours</option>
+            <option value="shared-tours">Shared with Me</option>
+        `;
+
         function toggleView() {
             const view = viewSelect.value;
 
@@ -767,20 +828,24 @@
                 window.campusTours?.showTourList?.({ restoreFocus: false, clearRoute: true });
                 showLocationList();
                 if (categoryFilter) {
+                    categoryFilter.innerHTML = locationCategoryOptions;
                     categoryFilter.disabled = false;
                 }
+                searchInput.disabled = false;
+                searchInput.placeholder = 'Search locations...';
             } else {
                 locationSection.hidden = true;
                 toursSection.hidden = false;
                 window.campusTours?.showTourList?.({ restoreFocus: false });
-                searchInput.value = '';
-                searchInput.disabled = true;
-                searchInput.placeholder = 'Search disabled for tours';
                 if (categoryFilter) {
-                    categoryFilter.disabled = true;
+                    categoryFilter.innerHTML = tourFilterOptions;
+                    categoryFilter.disabled = false;
                     categoryFilter.value = '';
                 }
-                updateEmptyState(locationItems.length);
+                searchInput.value = '';
+                searchInput.disabled = false;
+                searchInput.placeholder = 'Search tours...';
+                window.campusTours?.applyTourFilter?.('', '');
             }
         }
 
@@ -798,9 +863,25 @@
         }
 
         viewSelect.addEventListener('change', toggleView);
-        searchInput.addEventListener('input', applyFilter);
+        searchInput.addEventListener('input', () => {
+            const view = viewSelect.value;
+            if (view === 'locations') {
+                applyFilter();
+            } else {
+                const filterValue = categoryFilter ? categoryFilter.value : '';
+                window.campusTours?.applyTourFilter?.(filterValue, searchInput.value.trim().toLowerCase());
+            }
+        });
         if (categoryFilter) {
-            categoryFilter.addEventListener('change', applyFilter);
+            categoryFilter.addEventListener('change', () => {
+                const view = viewSelect.value;
+                if (view === 'locations') {
+                    applyFilter();
+                } else {
+                    const filterValue = categoryFilter.value;
+                    window.campusTours?.applyTourFilter?.(filterValue, searchInput.value.trim().toLowerCase());
+                }
+            });
         }
 
         toggleView();
@@ -1027,6 +1108,9 @@
         const tourContainer = document.getElementById('tour-items');
         const tourCreateBtn = document.getElementById('tour-create-btn');
         const tourListHeader = tourCreateBtn ? tourCreateBtn.closest('.tour-list-header') : null;
+        const noMyToursMsg = document.getElementById('no-my-tours');
+        const noSharedToursMsg = document.getElementById('no-shared-tours');
+        const noToursMatchMsg = document.getElementById('no-tours-match');
         const csrfToken = "{{ csrf_token }}";
 
         const noop = () => {};
@@ -1441,7 +1525,9 @@
 
             const stops = Array.isArray(tour.stops) ? [...tour.stops].sort((a, b) => a.order - b.order) : [];
             const stopCount = stops.length;
-            const editUrl = currentTourCard?.dataset.tourEditUrl || '';
+            const isSharedTour = currentTourCard?.dataset.tourType === 'shared';
+            const editUrl = isSharedTour ? '' : (currentTourCard?.dataset.tourEditUrl || '');
+            const sharedByDisplay = currentTourCard?.dataset.sharedByDisplay || '';
             const parts = [];
 
             const segments = tour.route_data?.segments || [];
@@ -1461,8 +1547,11 @@
             parts.push(`<article class="location-detail-card" data-tour-id="${tour.id}">`);
             parts.push('<header class="location-detail-header">');
             parts.push(`<h3 class="location-detail-title">${escapeHtml(tour.name || 'Untitled tour')}</h3>`);
-            parts.push('<span class="location-detail-category">Custom Tour</span>');
+            parts.push(`<span class="location-detail-category">${isSharedTour ? 'Shared Tour' : 'Custom Tour'}</span>`);
             parts.push('</header>');
+            if (isSharedTour && sharedByDisplay) {
+                parts.push(`<p class="tour-shared-by">Shared by <strong>${escapeHtml(sharedByDisplay)}</strong></p>`);
+            }
             parts.push(`<p class="tour-detail-meta">${stopCount} stop${stopCount === 1 ? '' : 's'}${totalDurationText}</p>`);
 
             if (tour.description) {
@@ -1830,6 +1919,57 @@
             });
         }
 
+        function applyTourFilter(filterValue, searchQuery = '') {
+            const allCards = Array.from(tourContainer.querySelectorAll('.tour-card'));
+            const ownedCards = allCards.filter(c => c.dataset.tourType === 'owned');
+            const sharedCards = allCards.filter(c => c.dataset.tourType === 'shared');
+            let visibleCount = 0;
+
+            allCards.forEach(card => {
+                const tourType = card.dataset.tourType;
+                const tourName = (card.dataset.tourName || '').toLowerCase();
+                const tourDescription = (card.dataset.tourDescription || '').toLowerCase();
+
+                const matchesSearch = !searchQuery ||
+                    tourName.includes(searchQuery) ||
+                    tourDescription.includes(searchQuery);
+
+                let matchesFilter = true;
+                if (filterValue === 'my-tours') {
+                    matchesFilter = tourType === 'owned';
+                } else if (filterValue === 'shared-tours') {
+                    matchesFilter = tourType === 'shared';
+                }
+
+                const isVisible = matchesSearch && matchesFilter;
+                card.hidden = !isVisible;
+
+                if (isVisible) {
+                    visibleCount++;
+                }
+            });
+
+            if (noMyToursMsg) {
+                const showNoMyTours = !searchQuery && (filterValue === '' || filterValue === 'my-tours') && ownedCards.length === 0;
+                noMyToursMsg.hidden = !showNoMyTours;
+            }
+            if (noSharedToursMsg) {
+                const showNoShared = !searchQuery && filterValue === 'shared-tours' && sharedCards.length === 0;
+                noSharedToursMsg.hidden = !showNoShared;
+            }
+            if (noToursMatchMsg) {
+                const hasCards = (filterValue === 'shared-tours') ? sharedCards.length > 0 :
+                                 (filterValue === 'my-tours') ? ownedCards.length > 0 : allCards.length > 0;
+                noToursMatchMsg.hidden = !(searchQuery && visibleCount === 0 && hasCards);
+            }
+
+            if (tourCreateBtn) {
+                tourCreateBtn.style.display = filterValue === 'shared-tours' ? 'none' : '';
+            }
+
+            tourContainer.dataset.filter = filterValue;
+        }
+
         attachCardHandlers();
 
         const toursApi = {
@@ -1839,6 +1979,7 @@
             showTourDetail,
             refreshTourList,
             addTourCard,
+            applyTourFilter,
         };
         window.campusTours = toursApi;
 
