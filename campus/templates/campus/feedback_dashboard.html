@@ -402,7 +402,7 @@ async function submitResponse(ratingId) {
     btn.textContent = 'Submitting...';
 
     try {
-        const response = await fetch(`/campus/admin/feedback/${ratingId}/respond/`, {
+        const response = await fetch(`/campus/feedback/${ratingId}/respond/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
