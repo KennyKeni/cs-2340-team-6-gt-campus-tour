@@ -339,6 +339,35 @@ submitBtn.addEventListener('click', async function() {
             const sectionTitle = document.querySelector('.rating-section h2');
             if (sectionTitle) sectionTitle.textContent = 'Your Review';
 
+            let existingRating = document.getElementById('existing-rating');
+            if (!existingRating) {
+                existingRating = document.createElement('div');
+                existingRating.id = 'existing-rating';
+                existingRating.style.marginBottom = '1rem';
+                const ratingForm = document.getElementById('rating-form');
+                ratingForm.parentNode.insertBefore(existingRating, ratingForm);
+                ratingForm.style.borderTop = '1px solid #ddd';
+                ratingForm.style.paddingTop = '1rem';
+                ratingForm.style.marginTop = '1rem';
+            }
+
+            let userStarsHtml = '';
+            for (let i = 1; i <= 5; i++) {
+                userStarsHtml += i <= selectedRating ? '&#9733;' : '&#9734;';
+            }
+            const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            existingRating.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                    <span id="user-rating-stars" style="color: #fbbf24; font-size: 1.25rem;">${userStarsHtml}</span>
+                    <span style="color: #666; font-size: 0.875rem;">${today}</span>
+                    <span style="padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; background: #fef3c7; color: #92400e;">New</span>
+                </div>
+                <p id="user-rating-comment" style="line-height: 1.6; color: #333; margin-bottom: 1rem;">${ratingComment.value.trim()}</p>
+            `;
+
+            const formPrompt = document.querySelector('#rating-form > p');
+            if (formPrompt) formPrompt.textContent = 'Update your rating:';
+
             submitBtn.textContent = 'Update Review';
         } else {
             showToast(data.error || 'Failed to submit rating', 'error');
