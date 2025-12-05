@@ -439,9 +439,55 @@ def location_detail(request, slug):
         'location': location,
         'is_bookmarked': is_bookmarked,
         'user_rating': user_rating,
+        'average_rating': location.average_rating(),
+        'rating_count': location.rating_count(),
         'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
     }
     return render(request, 'campus/location_detail.html', context)
+
+
+# -------------------------------------------------------------------------
+#  RATING VIEWS (User Story #10)
+# -------------------------------------------------------------------------
+@csrf_exempt
+@login_required
+@require_POST
+def rate_location(request, slug):
+    """Submit or update a rating for a location."""
+    location = get_object_or_404(Location, slug=slug)
+
+    try:
+        payload = json.loads(request.body)
+    except JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+    score = payload.get('score')
+    if not score or not isinstance(score, int) or score < 1 or score > 5:
+        return JsonResponse({'error': 'Score must be an integer between 1 and 5.'}, status=400)
+
+    comment = (payload.get('comment') or '').strip()
+
+    rating, created = Rating.objects.update_or_create(
+        user=request.user,
+        location=location,
+        defaults={
+            'score': score,
+            'comment': comment,
+            'status': 'new',
+        }
+    )
+
+    return JsonResponse({
+        'success': True,
+        'created': created,
+        'average_rating': location.average_rating(),
+        'rating_count': location.rating_count(),
+        'user_rating': {
+            'score': rating.score,
+            'comment': rating.comment,
+            'created_at': rating.created_at.isoformat(),
+        },
+    })
 
 
 # -------------------------------------------------------------------------

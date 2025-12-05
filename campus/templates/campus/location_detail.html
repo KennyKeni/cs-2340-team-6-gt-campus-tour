@@ -22,6 +22,18 @@ main {
                 {% if location.category %}
                 <p style="color: #666; margin: 0;"><strong>Category:</strong> {{ location.category }}</p>
                 {% endif %}
+                <div class="average-rating-display" style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span id="avg-stars" style="color: #fbbf24; font-size: 1.25rem;">
+                        {% if average_rating %}
+                            {% for i in "12345" %}{% if forloop.counter <= average_rating %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
+                        {% else %}
+                            &#9734;&#9734;&#9734;&#9734;&#9734;
+                        {% endif %}
+                    </span>
+                    <span id="avg-text" style="color: #666; font-size: 0.875rem;">
+                        {% if average_rating %}{{ average_rating }} ({{ rating_count }} rating{{ rating_count|pluralize }}){% else %}No ratings yet{% endif %}
+                    </span>
+                </div>
             </div>
             {% if user.is_authenticated %}
             <button class="bookmark-btn"
@@ -100,36 +112,63 @@ main {
     </div>
     {% endif %}
 
-    {% if user_rating %}
-    <div class="user-rating-section" style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
-        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Your Review</h2>
-        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
-            <span style="color: #fbbf24; font-size: 1.25rem;">
-                {% for i in "12345" %}
-                    {% if forloop.counter <= user_rating.score %}&#9733;{% else %}&#9734;{% endif %}
-                {% endfor %}
-            </span>
-            <span style="color: #666; font-size: 0.875rem;">{{ user_rating.created_at|date:"M d, Y" }}</span>
-            <span style="padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-                {% if user_rating.status == 'new' %}background: #fef3c7; color: #92400e;
-                {% elif user_rating.status == 'reviewed' %}background: #dbeafe; color: #1e40af;
-                {% else %}background: #d1fae5; color: #065f46;{% endif %}">
-                {{ user_rating.get_status_display }}
-            </span>
+    {% if user.is_authenticated %}
+    <div class="rating-section" style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">{% if user_rating %}Your Review{% else %}Rate This Location{% endif %}</h2>
+
+        {% if user_rating %}
+        <div id="existing-rating" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                <span id="user-rating-stars" style="color: #fbbf24; font-size: 1.25rem;">
+                    {% for i in "12345" %}
+                        {% if forloop.counter <= user_rating.score %}&#9733;{% else %}&#9734;{% endif %}
+                    {% endfor %}
+                </span>
+                <span style="color: #666; font-size: 0.875rem;">{{ user_rating.created_at|date:"M d, Y" }}</span>
+                <span style="padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+                    {% if user_rating.status == 'new' %}background: #fef3c7; color: #92400e;
+                    {% elif user_rating.status == 'reviewed' %}background: #dbeafe; color: #1e40af;
+                    {% else %}background: #d1fae5; color: #065f46;{% endif %}">
+                    {{ user_rating.get_status_display }}
+                </span>
+            </div>
+            <p id="user-rating-comment" style="line-height: 1.6; color: #333; margin-bottom: 1rem;">{% if user_rating.comment %}{{ user_rating.comment }}{% endif %}</p>
+
+            {% if user_rating.admin_response %}
+            <div style="margin-top: 1rem; padding: 1rem; background: #e0f2fe; border-radius: 8px; border-left: 4px solid #0284c7;">
+                <h3 style="font-size: 1rem; margin: 0 0 0.5rem 0; color: #0369a1;">Admin Response</h3>
+                <p style="line-height: 1.6; color: #333; margin: 0 0 0.5rem 0;">{{ user_rating.admin_response }}</p>
+                <span style="font-size: 0.75rem; color: #666;">
+                    Responded by {{ user_rating.responded_by.username }} on {{ user_rating.responded_at|date:"M d, Y" }}
+                </span>
+            </div>
+            {% endif %}
         </div>
-        {% if user_rating.comment %}
-        <p style="line-height: 1.6; color: #333; margin-bottom: 1rem;">{{ user_rating.comment }}</p>
         {% endif %}
 
-        {% if user_rating.admin_response %}
-        <div style="margin-top: 1rem; padding: 1rem; background: #e0f2fe; border-radius: 8px; border-left: 4px solid #0284c7;">
-            <h3 style="font-size: 1rem; margin: 0 0 0.5rem 0; color: #0369a1;">Admin Response</h3>
-            <p style="line-height: 1.6; color: #333; margin: 0 0 0.5rem 0;">{{ user_rating.admin_response }}</p>
-            <span style="font-size: 0.75rem; color: #666;">
-                Responded by {{ user_rating.responded_by.username }} on {{ user_rating.responded_at|date:"M d, Y" }}
-            </span>
+        <div id="rating-form" style="{% if user_rating %}border-top: 1px solid #ddd; padding-top: 1rem; margin-top: 1rem;{% endif %}">
+            <p style="margin-bottom: 0.75rem; color: #666;">{% if user_rating %}Update your rating:{% else %}Click to rate:{% endif %}</p>
+            <div class="star-input" style="display: flex; gap: 0.25rem; margin-bottom: 1rem;">
+                {% for i in "12345" %}
+                <button type="button" class="star-btn" data-value="{{ forloop.counter }}"
+                        style="background: none; border: none; cursor: pointer; font-size: 2rem; color: #ddd; padding: 0; transition: color 0.1s;">
+                    &#9733;
+                </button>
+                {% endfor %}
+            </div>
+            <input type="hidden" id="selected-rating" value="{% if user_rating %}{{ user_rating.score }}{% else %}0{% endif %}">
+
+            <div style="margin-bottom: 1rem;">
+                <label for="rating-comment" style="display: block; margin-bottom: 0.5rem; color: #666;">Comment (optional):</label>
+                <textarea id="rating-comment" rows="3" placeholder="Share your experience..."
+                          style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 0.875rem; resize: vertical;">{% if user_rating %}{{ user_rating.comment }}{% endif %}</textarea>
+            </div>
+
+            <button type="button" id="submit-rating-btn"
+                    style="padding: 0.75rem 1.5rem; background: #003057; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">
+                {% if user_rating %}Update Review{% else %}Submit Review{% endif %}
+            </button>
         </div>
-        {% endif %}
     </div>
     {% endif %}
 </div>
@@ -140,6 +179,20 @@ main {
 }
 .bookmark-icon.bookmarked {
     fill: #fbbf24;
+}
+.star-btn:hover,
+.star-btn.hovered {
+    color: #fbbf24 !important;
+}
+.star-btn.selected {
+    color: #fbbf24 !important;
+}
+#submit-rating-btn:hover {
+    background: #002244 !important;
+}
+#submit-rating-btn:disabled {
+    background: #ccc !important;
+    cursor: not-allowed;
 }
 </style>
 
@@ -202,6 +255,102 @@ document.querySelector('.bookmark-btn').addEventListener('click', async function
         }
     } catch (error) {
         console.error('Error toggling bookmark:', error);
+    }
+});
+
+// Rating functionality
+const starBtns = document.querySelectorAll('.star-btn');
+const selectedRatingInput = document.getElementById('selected-rating');
+const submitBtn = document.getElementById('submit-rating-btn');
+const ratingComment = document.getElementById('rating-comment');
+
+let selectedRating = parseInt(selectedRatingInput.value) || 0;
+
+function updateStarDisplay(rating, isHover = false) {
+    starBtns.forEach((btn, index) => {
+        if (index < rating) {
+            btn.classList.add(isHover ? 'hovered' : 'selected');
+            if (!isHover) btn.classList.remove('hovered');
+        } else {
+            btn.classList.remove(isHover ? 'hovered' : 'selected');
+            if (!isHover) btn.classList.remove('hovered');
+        }
+    });
+}
+
+updateStarDisplay(selectedRating);
+
+starBtns.forEach(btn => {
+    btn.addEventListener('mouseenter', function() {
+        const value = parseInt(this.dataset.value);
+        updateStarDisplay(value, true);
+    });
+
+    btn.addEventListener('mouseleave', function() {
+        updateStarDisplay(0, true);
+        updateStarDisplay(selectedRating);
+    });
+
+    btn.addEventListener('click', function() {
+        selectedRating = parseInt(this.dataset.value);
+        selectedRatingInput.value = selectedRating;
+        updateStarDisplay(selectedRating);
+    });
+});
+
+submitBtn.addEventListener('click', async function() {
+    if (selectedRating < 1 || selectedRating > 5) {
+        showToast('Please select a rating (1-5 stars)', 'error');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    try {
+        const response = await fetch('/campus/api/locations/{{ location.slug }}/rate/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+                score: selectedRating,
+                comment: ratingComment.value.trim(),
+            }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            showToast(data.created ? 'Review submitted!' : 'Review updated!', 'success');
+
+            const avgStars = document.getElementById('avg-stars');
+            const avgText = document.getElementById('avg-text');
+            if (data.average_rating) {
+                let starsHtml = '';
+                for (let i = 1; i <= 5; i++) {
+                    starsHtml += i <= data.average_rating ? '&#9733;' : '&#9734;';
+                }
+                avgStars.innerHTML = starsHtml;
+                avgText.textContent = `${data.average_rating} (${data.rating_count} rating${data.rating_count !== 1 ? 's' : ''})`;
+            }
+
+            const sectionTitle = document.querySelector('.rating-section h2');
+            if (sectionTitle) sectionTitle.textContent = 'Your Review';
+
+            submitBtn.textContent = 'Update Review';
+        } else {
+            showToast(data.error || 'Failed to submit rating', 'error');
+        }
+    } catch (error) {
+        console.error('Error submitting rating:', error);
+        showToast('An error occurred. Please try again.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        if (submitBtn.textContent === 'Submitting...') {
+            submitBtn.textContent = '{% if user_rating %}Update Review{% else %}Submit Review{% endif %}';
+        }
     }
 });
 {% endif %}

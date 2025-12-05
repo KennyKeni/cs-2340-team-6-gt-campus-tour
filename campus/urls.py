@@ -21,6 +21,11 @@ urlpatterns = [
     path('api/tours/<int:tour_id>/bookmark/', views.toggle_tour_bookmark, name='toggle-tour-bookmark'),
 
     # ---------------------------------------------------------------------
+    # Rating endpoints (User Story #10)
+    # ---------------------------------------------------------------------
+    path('api/locations/<slug:slug>/rate/', views.rate_location, name='rate_location'),
+
+    # ---------------------------------------------------------------------
     # New admin CRUD endpoints (User Story #12 – Shashwat)
     # ---------------------------------------------------------------------
     path('manage/', views.manage_locations, name='manage_locations'),

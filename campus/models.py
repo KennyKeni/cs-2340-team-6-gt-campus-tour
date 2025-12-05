@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.contrib.auth.models import User
+from django.db.models import Avg
 from django.utils.text import slugify
 
 
@@ -67,13 +67,16 @@ class Location(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """
-        Automatically generate a slug from the name if not provided.
-        Example: 'Tech Tower' → 'tech-tower'
-        """
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+
+    def average_rating(self):
+        avg = self.ratings.aggregate(Avg('score'))['score__avg']
+        return round(avg, 1) if avg else None
+
+    def rating_count(self):
+        return self.ratings.count()
 
 
 class Bookmark(models.Model):
