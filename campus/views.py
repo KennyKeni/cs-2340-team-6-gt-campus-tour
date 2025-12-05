@@ -7,12 +7,15 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from django.core.paginator import Paginator
+from datetime import datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.db.models import Q
 
 from .ai import CampusAiError, ChatMessage, ChatResult, get_landmark_context, run_landmark_chat, TourAgentDeps
-from .models import Location, Bookmark, Tour, TourStop, TourBookmark, SharedTour
+from .models import Location, Bookmark, Tour, TourStop, TourBookmark, SharedTour, Rating
 from .forms import LocationForm
 from .route_utils import calculate_route_segments, RouteCalculationError
 from accounts.models import Friendship
@@ -426,14 +429,16 @@ def location_detail(request, slug):
     """Display detailed information about a specific location."""
     location = get_object_or_404(Location, slug=slug)
 
-    # Check if user has bookmarked this location
     is_bookmarked = False
+    user_rating = None
     if request.user.is_authenticated:
         is_bookmarked = Bookmark.objects.filter(user=request.user, location=location).exists()
+        user_rating = Rating.objects.filter(user=request.user, location=location).select_related('responded_by').first()
 
     context = {
         'location': location,
         'is_bookmarked': is_bookmarked,
+        'user_rating': user_rating,
         'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
     }
     return render(request, 'campus/location_detail.html', context)
@@ -886,10 +891,100 @@ def remove_shared_tour(request, share_id):
 def revoke_tour_share(request, share_id):
     """Tour owner revokes sharing from a specific user."""
     share = get_object_or_404(SharedTour, id=share_id)
-    
+
     # Validate ownership
     if share.tour.user != request.user:
         return JsonResponse({'error': 'You can only revoke shares of your own tours.'}, status=403)
-    
+
     share.delete()
     return JsonResponse({'success': True, 'message': 'Tour sharing revoked.'})
+
+
+# -------------------------------------------------------------------------
+#  ADMIN FEEDBACK VIEWS (User Story #13)
+# -------------------------------------------------------------------------
+@user_passes_test(admin_check)
+def feedback_dashboard(request):
+    """Admin dashboard to view and manage user feedback."""
+    ratings = Rating.objects.select_related('user', 'location', 'responded_by').all()
+
+    status_filter = request.GET.get('status', '')
+    if status_filter and status_filter in ['new', 'reviewed', 'resolved']:
+        ratings = ratings.filter(status=status_filter)
+
+    location_filter = request.GET.get('location', '')
+    if location_filter:
+        ratings = ratings.filter(location__slug=location_filter)
+
+    date_from = request.GET.get('date_from', '')
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, '%Y-%m-%d')
+            ratings = ratings.filter(created_at__date__gte=from_date.date())
+        except ValueError:
+            pass
+
+    date_to = request.GET.get('date_to', '')
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, '%Y-%m-%d')
+            ratings = ratings.filter(created_at__date__lte=to_date.date())
+        except ValueError:
+            pass
+
+    ratings = ratings.order_by('-created_at')
+
+    paginator = Paginator(ratings, 10)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    locations = Location.objects.all().order_by('name')
+
+    context = {
+        'page_obj': page_obj,
+        'locations': locations,
+        'status_filter': status_filter,
+        'location_filter': location_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'status_choices': Rating.STATUS_CHOICES,
+    }
+    return render(request, 'campus/feedback_dashboard.html', context)
+
+
+@csrf_exempt
+@user_passes_test(admin_check)
+@require_POST
+def respond_to_feedback(request, rating_id):
+    """Admin responds to a feedback item and updates its status."""
+    rating = get_object_or_404(Rating, id=rating_id)
+
+    try:
+        payload = json.loads(request.body)
+    except JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+    response_text = (payload.get('response') or '').strip()
+    new_status = payload.get('status', '')
+
+    if new_status and new_status not in ['new', 'reviewed', 'resolved']:
+        return JsonResponse({'error': 'Invalid status value.'}, status=400)
+
+    if response_text:
+        rating.admin_response = response_text
+        rating.responded_by = request.user
+        rating.responded_at = timezone.now()
+
+    if new_status:
+        rating.status = new_status
+
+    rating.save()
+
+    return JsonResponse({
+        'success': True,
+        'rating_id': rating.id,
+        'status': rating.status,
+        'admin_response': rating.admin_response,
+        'responded_by': rating.responded_by.username if rating.responded_by else None,
+        'responded_at': rating.responded_at.isoformat() if rating.responded_at else None,
+    })

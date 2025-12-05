@@ -99,6 +99,39 @@ main {
         <p style="line-height: 1.6; color: #333; white-space: pre-line;">{{ location.historical_info }}</p>
     </div>
     {% endif %}
+
+    {% if user_rating %}
+    <div class="user-rating-section" style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Your Review</h2>
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+            <span style="color: #fbbf24; font-size: 1.25rem;">
+                {% for i in "12345" %}
+                    {% if forloop.counter <= user_rating.score %}&#9733;{% else %}&#9734;{% endif %}
+                {% endfor %}
+            </span>
+            <span style="color: #666; font-size: 0.875rem;">{{ user_rating.created_at|date:"M d, Y" }}</span>
+            <span style="padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+                {% if user_rating.status == 'new' %}background: #fef3c7; color: #92400e;
+                {% elif user_rating.status == 'reviewed' %}background: #dbeafe; color: #1e40af;
+                {% else %}background: #d1fae5; color: #065f46;{% endif %}">
+                {{ user_rating.get_status_display }}
+            </span>
+        </div>
+        {% if user_rating.comment %}
+        <p style="line-height: 1.6; color: #333; margin-bottom: 1rem;">{{ user_rating.comment }}</p>
+        {% endif %}
+
+        {% if user_rating.admin_response %}
+        <div style="margin-top: 1rem; padding: 1rem; background: #e0f2fe; border-radius: 8px; border-left: 4px solid #0284c7;">
+            <h3 style="font-size: 1rem; margin: 0 0 0.5rem 0; color: #0369a1;">Admin Response</h3>
+            <p style="line-height: 1.6; color: #333; margin: 0 0 0.5rem 0;">{{ user_rating.admin_response }}</p>
+            <span style="font-size: 0.75rem; color: #666;">
+                Responded by {{ user_rating.responded_by.username }} on {{ user_rating.responded_at|date:"M d, Y" }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <style>

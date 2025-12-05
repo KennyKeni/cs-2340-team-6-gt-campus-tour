@@ -44,4 +44,10 @@ urlpatterns = [
     path('api/tours/shared/', views.shared_tours_list, name='shared_tours_list'),
     path('api/tours/shared/<int:share_id>/', views.remove_shared_tour, name='remove_shared_tour'),
     path('api/tours/shared/<int:share_id>/revoke/', views.revoke_tour_share, name='revoke_tour_share'),
+
+    # ---------------------------------------------------------------------
+    # Admin Feedback endpoints (User Story #13)
+    # ---------------------------------------------------------------------
+    path('admin/feedback/', views.feedback_dashboard, name='feedback_dashboard'),
+    path('admin/feedback/<int:rating_id>/respond/', views.respond_to_feedback, name='respond_to_feedback'),
 ]
