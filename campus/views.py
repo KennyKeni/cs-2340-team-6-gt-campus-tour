@@ -58,7 +58,11 @@ def campus_overview(request):
 
     tours = []
     shared_tours = []
+    official_tours = []
     bookmarked_tour_ids = set()
+
+    official_tours = Tour.objects.filter(is_official=True).prefetch_related('stops__location')
+
     if request.user.is_authenticated:
         tours = Tour.objects.filter(user=request.user).prefetch_related('stops__location')
         bookmarked_tour_ids = set(
@@ -85,6 +89,7 @@ def campus_overview(request):
         'bookmarked_slugs': list(bookmarked_slugs),
         'tours': tours,
         'shared_tours': shared_tours,
+        'official_tours': official_tours,
         'bookmarked_tour_ids': bookmarked_tour_ids,
         'google_maps_api_key': settings.GOOGLE_MAP_API_KEY,
         'map_center': {'lat': 33.7780, 'lng': -84.3980},
@@ -543,6 +548,7 @@ def tour_list(request):
         shared_records = SharedTour.objects.filter(
             shared_with=request.user
         ).select_related('tour', 'shared_by').prefetch_related('tour__stops__location')
+        official_tours = Tour.objects.filter(is_official=True).prefetch_related('stops__location')
 
         data = []
         for tour in owned_tours:
@@ -571,6 +577,7 @@ def tour_list(request):
                 'stops': stops,
                 'route_data': tour.route_data,
                 'tour_type': 'owned',
+                'is_official': tour.is_official,
             })
 
         for record in shared_records:
@@ -603,6 +610,38 @@ def tour_list(request):
                 'shared_by': record.shared_by.username,
                 'shared_by_display': record.shared_by.get_full_name() or record.shared_by.username,
                 'share_id': record.id,
+                'is_official': tour.is_official,
+            })
+
+        for tour in official_tours:
+            if tour.user == request.user:
+                continue
+            stops = []
+            for stop in tour.stops.all():
+                stops.append({
+                    'id': stop.id,
+                    'location_id': stop.location.id,
+                    'order': stop.order,
+                    'location': {
+                        'id': stop.location.id,
+                        'name': stop.location.name,
+                        'slug': stop.location.slug,
+                        'description': stop.location.description,
+                        'latitude': float(stop.location.latitude),
+                        'longitude': float(stop.location.longitude),
+                        'address': stop.location.address,
+                        'category': stop.location.category,
+                    }
+                })
+            data.append({
+                'id': tour.id,
+                'name': tour.name,
+                'description': tour.description,
+                'created_at': tour.created_at.isoformat(),
+                'stops': stops,
+                'route_data': tour.route_data,
+                'tour_type': 'official',
+                'is_official': True,
             })
 
         return JsonResponse({'tours': data})

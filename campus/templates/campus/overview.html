@@ -89,7 +89,7 @@
                     <p class="sidebar-support-text">Select a tour to preview its stops and highlight the full route on the map.</p>
                     <div id="tour-items" class="tour-list" data-filter="my-tours">
                         {% for tour in tours %}
-                        <article class="tour-card"
+                        <article class="tour-card{% if tour.is_official %} official-tour-card{% endif %}"
                                  data-tour-id="{{ tour.id }}"
                                  data-tour-name="{{ tour.name|escape }}"
                                  data-tour-description="{{ tour.description|default_if_none:''|escape }}"
@@ -97,11 +97,12 @@
                                  data-tour-edit-url="{% url 'campus:tour-edit' tour.id %}"
                                  data-bookmarked="{% if tour.id in bookmarked_tour_ids %}true{% else %}false{% endif %}"
                                  data-tour-type="owned"
+                                 data-is-official="{% if tour.is_official %}true{% else %}false{% endif %}"
                                  role="button"
                                  tabindex="0">
                             <div class="tour-card-header">
                                 <div>
-                                    <h3 class="tour-title">{{ tour.name }}</h3>
+                                    <h3 class="tour-title">{{ tour.name }}{% if tour.is_official %} <span class="official-badge">Official</span>{% endif %}</h3>
                                     <p class="tour-stops-count">{{ tour.stops.count }} stop{{ tour.stops.count|pluralize }}</p>
                                 </div>
                                 <div class="tour-card-actions">
@@ -167,6 +168,49 @@
                             {% endif %}
                         </article>
                         {% endfor %}
+
+                        {% for tour in official_tours %}
+                        {% if not user.is_authenticated or tour.user != user %}
+                        <article class="tour-card official-tour-card"
+                                 data-tour-id="{{ tour.id }}"
+                                 data-tour-name="{{ tour.name|escape }}"
+                                 data-tour-description="{{ tour.description|default_if_none:''|escape }}"
+                                 data-tour-stop-count="{{ tour.stops.count }}"
+                                 data-bookmarked="{% if tour.id in bookmarked_tour_ids %}true{% else %}false{% endif %}"
+                                 data-tour-type="official"
+                                 data-is-official="true"
+                                 role="button"
+                                 tabindex="0">
+                            <div class="tour-card-header">
+                                <div>
+                                    <h3 class="tour-title">{{ tour.name }} <span class="official-badge">Official</span></h3>
+                                    <p class="tour-stops-count">{{ tour.stops.count }} stop{{ tour.stops.count|pluralize }}</p>
+                                </div>
+                                <div class="tour-card-actions">
+                                    {% if user.is_authenticated %}
+                                    <button class="tour-bookmark-btn sidebar-tour-bookmark"
+                                            data-tour-id="{{ tour.id }}"
+                                            data-bookmarked="{% if tour.id in bookmarked_tour_ids %}true{% else %}false{% endif %}"
+                                            title="{% if tour.id in bookmarked_tour_ids %}Remove bookmark{% else %}Add bookmark{% endif %}"
+                                            aria-label="Bookmark {{ tour.name }}">
+                                        <svg class="bookmark-icon {% if tour.id in bookmarked_tour_ids %}bookmarked{% endif %}"
+                                             width="20" height="20" viewBox="0 0 24 24"
+                                             fill="{% if tour.id in bookmarked_tour_ids %}currentColor{% else %}none{% endif %}"
+                                             stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                                        </svg>
+                                    </button>
+                                    {% endif %}
+                                    <span class="tour-card-indicator" aria-hidden="true">›</span>
+                                </div>
+                            </div>
+                            {% if tour.description %}
+                            <p class="tour-description-preview">{{ tour.description|truncatewords:22 }}</p>
+                            {% endif %}
+                        </article>
+                        {% endif %}
+                        {% endfor %}
+                        <p class="sidebar-empty" id="no-official-tours" hidden>No official tours available.</p>
                         <p class="sidebar-empty" id="no-shared-tours" hidden>No tours have been shared with you yet.</p>
                         <p class="sidebar-empty" id="no-tours-match" hidden>No tours match your search.</p>
                     </div>
@@ -815,6 +859,7 @@
 
         const tourFilterOptions = `
             <option value="">All Tours</option>
+            <option value="official-tours">Official Tours</option>
             <option value="my-tours">My Tours</option>
             <option value="shared-tours">Shared with Me</option>
         `;
@@ -1415,23 +1460,34 @@
 
         function createTourCardElement(tour) {
             const card = document.createElement('article');
-            card.className = 'tour-card';
+            const isOfficial = tour.is_official || false;
+            const tourType = tour.tour_type || 'owned';
+            let cardClass = 'tour-card';
+            if (isOfficial) {
+                cardClass += ' official-tour-card';
+            } else if (tourType === 'shared') {
+                cardClass += ' shared-tour-card';
+            }
+            card.className = cardClass;
             card.dataset.tourId = tour.id;
             card.dataset.tourName = tour.name || '';
             card.dataset.tourDescription = tour.description || '';
             card.dataset.tourStopCount = tour.stops ? tour.stops.length : 0;
             card.dataset.tourEditUrl = `{% url 'campus:tour-edit' 0 %}`.replace('0', tour.id);
             card.dataset.bookmarked = 'false';
+            card.dataset.tourType = tourType;
+            card.dataset.isOfficial = isOfficial ? 'true' : 'false';
             card.setAttribute('role', 'button');
             card.setAttribute('tabindex', '0');
 
             const stopCount = tour.stops ? tour.stops.length : 0;
             const stopText = stopCount === 1 ? '1 stop' : `${stopCount} stops`;
+            const officialBadge = isOfficial ? ' <span class="official-badge">Official</span>' : '';
 
             card.innerHTML = `
                 <div class="tour-card-header">
                     <div>
-                        <h3 class="tour-title">${escapeHtml(tour.name || 'Untitled')}</h3>
+                        <h3 class="tour-title">${escapeHtml(tour.name || 'Untitled')}${officialBadge}</h3>
                         <p class="tour-stops-count">${stopText}</p>
                     </div>
                     <div class="tour-card-actions">
@@ -1923,6 +1979,7 @@
             const allCards = Array.from(tourContainer.querySelectorAll('.tour-card'));
             const ownedCards = allCards.filter(c => c.dataset.tourType === 'owned');
             const sharedCards = allCards.filter(c => c.dataset.tourType === 'shared');
+            const officialCards = allCards.filter(c => c.dataset.tourType === 'official');
             let visibleCount = 0;
 
             allCards.forEach(card => {
@@ -1939,6 +1996,8 @@
                     matchesFilter = tourType === 'owned';
                 } else if (filterValue === 'shared-tours') {
                     matchesFilter = tourType === 'shared';
+                } else if (filterValue === 'official-tours') {
+                    matchesFilter = tourType === 'official';
                 }
 
                 const isVisible = matchesSearch && matchesFilter;
@@ -1957,14 +2016,21 @@
                 const showNoShared = !searchQuery && filterValue === 'shared-tours' && sharedCards.length === 0;
                 noSharedToursMsg.hidden = !showNoShared;
             }
+            const noOfficialToursMsg = document.getElementById('no-official-tours');
+            if (noOfficialToursMsg) {
+                const showNoOfficial = !searchQuery && filterValue === 'official-tours' && officialCards.length === 0;
+                noOfficialToursMsg.hidden = !showNoOfficial;
+            }
             if (noToursMatchMsg) {
-                const hasCards = (filterValue === 'shared-tours') ? sharedCards.length > 0 :
-                                 (filterValue === 'my-tours') ? ownedCards.length > 0 : allCards.length > 0;
+                let hasCards = allCards.length > 0;
+                if (filterValue === 'shared-tours') hasCards = sharedCards.length > 0;
+                else if (filterValue === 'my-tours') hasCards = ownedCards.length > 0;
+                else if (filterValue === 'official-tours') hasCards = officialCards.length > 0;
                 noToursMatchMsg.hidden = !(searchQuery && visibleCount === 0 && hasCards);
             }
 
             if (tourCreateBtn) {
-                tourCreateBtn.style.display = filterValue === 'shared-tours' ? 'none' : '';
+                tourCreateBtn.style.display = (filterValue === 'shared-tours' || filterValue === 'official-tours') ? 'none' : '';
             }
 
             tourContainer.dataset.filter = filterValue;

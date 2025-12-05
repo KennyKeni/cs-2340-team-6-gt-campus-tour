@@ -151,6 +151,10 @@ class Tour(models.Model):
         null=True,
         help_text="Cached route segments from Google Directions API"
     )
+    is_official = models.BooleanField(
+        default=False,
+        help_text="Mark as official tour visible to all users."
+    )
 
     class Meta:
         ordering = ['-created_at']
