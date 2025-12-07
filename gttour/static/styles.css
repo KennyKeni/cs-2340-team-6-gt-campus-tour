@@ -89,6 +89,8 @@ main {
     padding: 0.75rem 1rem 1rem;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .campus-layout {
@@ -260,6 +262,24 @@ main {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.02em;
+}
+
+.location-detail-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.location-detail-rating .rating-stars {
+    color: #fbbf24;
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+}
+
+.location-detail-rating .rating-text {
+    color: #64748b;
+    font-size: 0.875rem;
 }
 
 .location-detail-address,

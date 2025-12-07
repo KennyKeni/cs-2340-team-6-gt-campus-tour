@@ -44,7 +44,7 @@ def _build_agent() -> Agent[TourAgentDeps, str]:
     from pydantic_ai.providers.openrouter import OpenRouterProvider
 
     model = OpenAIChatModel(
-        'openai/gpt-oss-120b',
+        'openai/gpt-oss-120b:exacto',
         provider=OpenRouterProvider(api_key=api_key),
     )
 
